@@ -562,11 +562,11 @@
     </label>
     <div id="galeriaGeneral" class="galeria-general"></div>
 
-    <label>Polígono KML de la superficie trabajada</label>
-    <p class="hint" style="margin-top:-2px;">Sube el archivo .kml del polígono de la parcela sobre la que se trabajó en esta jornada.</p>
+    <label>Polígonos KML de la superficie trabajada</label>
+    <p class="hint" style="margin-top:-2px;">Sube uno o varios archivos .kml de los polígonos de las parcelas sobre las que se trabajó en esta jornada (puedes seleccionar varios a la vez, o agregarlos uno por uno).</p>
     <label class="foto-capture-btn" for="kmlInput" style="margin-top:6px;">
-      🗺️ Cargar archivo KML
-      <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml" style="display:none;" onchange="onKmlInput(this)">
+      🗺️ Cargar archivo(s) KML
+      <input type="file" id="kmlInput" accept=".kml,application/vnd.google-earth.kml+xml" multiple style="display:none;" onchange="onKmlInput(this)">
     </label>
     <div id="kmlInfo"></div>
   </div>
@@ -625,6 +625,15 @@
       <label class="first" style="margin-top:0;">Avance acumulado de esta parcela (todos los días)</label>
       <p class="hint" style="margin-top:0;">Suma el avance diario de todas las jornadas guardadas de esta misma parcela (de cualquier fecha), más el avance de hoy, hasta llegar al inventario total.</p>
       <div id="acumuladoParcelaContenido"></div>
+
+      <label style="margin-top:10px;">Cargar avance previo (de antes de usar este formato)</label>
+      <p class="hint" style="margin-top:0;">Si esta parcela ya tenía avance de fertilización antes de empezar a usar esta app, regístralo aquí con su fecha real para que se sume al acumulado.</p>
+      <div class="row2">
+        <div><label class="first">Fecha del avance</label><input type="date" id="fechaAvancePrevio"></div>
+        <div><label class="first">Plantas fertilizadas</label><input type="number" id="plantasAvancePrevio" min="0" placeholder="Ej. 5000"></div>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="agregarAvancePrevio()" type="button">+ Agregar avance previo</button>
+      <div id="avancesPreviosLista" style="margin-top:8px;"></div>
     </div>
   </div>
 
@@ -859,7 +868,7 @@ let estado = {
   costales: [],           // {numero, hora, peso, aplicadoPor, evidenciaFoto}
   muestrasTestigo: [],    // {numero, antes, despues}
   evidenciasGenerales: [], // [{dataUrl, hora}]
-  kml: null,    // {archivo, placemark, vertices, areaHa, puntos}
+  kmls: [],    // [{archivo, placemark, vertices, areaHa, puntos}]
   auditor: {nombre:'Jorge López Carranza', firma:null, fecha:''},
   observaciones: '',
   _editandoHistorialId: null
@@ -906,7 +915,9 @@ function iniciar(){
   if(!estado.costales) estado.costales = [];
   if(!estado.muestrasTestigo) estado.muestrasTestigo = [];
   if(estado.pesoCostalDefault === undefined || estado.pesoCostalDefault === null || estado.pesoCostalDefault === '') estado.pesoCostalDefault = 50;
-  if(estado.kml === undefined) estado.kml = null;
+  if(!estado.kmls){
+    estado.kmls = estado.kml ? [estado.kml] : []; // compatibilidad con registros guardados antes de este cambio
+  }
   if(!estado.auditor) estado.auditor = {nombre:'Jorge López Carranza', firma:null, fecha:''};
   estado.costales.forEach(c=>{
     if(c.peso === undefined || c.peso === null || c.peso === '') c.peso = estado.pesoCostalDefault;
@@ -1393,6 +1404,79 @@ function actualizarAcumuladoParcela(){
     <div class="progress-bar"><div class="fill ${sem.clase}" style="width:${pctBarra}%"></div></div>
     <p class="hint" style="margin-bottom:0;">${inventario ? (sem.emoji+' '+pct+'% del inventario de la parcela fertilizado') : 'Captura el inventario de la parcela para calcular el %.'}</p>
   `;
+  pintarAvancesPreviosLista();
+}
+
+// Convierte una fecha "YYYY-MM-DD" (de un <input type="date">) al formato "DD/MM/YYYY" usado en todo el formulario
+function fechaInputADDMMYYYY(valorFecha){
+  const [y,m,d] = valorFecha.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// Registra manualmente un avance de una fecha anterior a cuando se empezó a usar este formato,
+// para que se sume al acumulado de la parcela.
+function agregarAvancePrevio(){
+  if(!estado.parcela){
+    alert('Primero selecciona una parcela en la sección 1.');
+    return;
+  }
+  const fechaVal = document.getElementById('fechaAvancePrevio').value;
+  const plantasVal = document.getElementById('plantasAvancePrevio').value;
+  if(!fechaVal){ alert('Elige la fecha del avance previo.'); return; }
+  if(plantasVal === '' || isNaN(parseFloat(plantasVal)) || parseFloat(plantasVal) <= 0){
+    alert('Escribe cuántas plantas se fertilizaron en esa fecha.');
+    return;
+  }
+  const fechaFmt = fechaInputADDMMYYYY(fechaVal);
+  const registro = {
+    _id: 'previo_' + Date.now(),
+    _archivadoEn: fmtFechaHora(new Date()),
+    _avancePrevio: true,
+    fechaHora: fechaFmt + ' 00:00',
+    jefeArea: estado.jefeArea, supervisor: estado.supervisor,
+    tipoFertilizante: estado.tipoFertilizante,
+    parcela: estado.parcela, parcelaIdx: estado.parcelaIdx,
+    hectareas: estado.hectareas, anioPlantacion: estado.anioPlantacion,
+    inventarioParcela: estado.inventarioParcela,
+    ubicacion: null,
+    avanceDiarioManual: parseFloat(plantasVal) || 0,
+    jornaleros: '',
+    costales: [], muestrasTestigo: [], evidenciasGenerales: [], kmls: [],
+    auditor: {nombre:'', firma:null, fecha:''},
+    observaciones: 'Avance previo cargado manualmente (registrado antes de usar este formato digital).'
+  };
+  const historial = cargarHistorial();
+  historial.push(registro);
+  guardarHistorial(historial);
+
+  document.getElementById('fechaAvancePrevio').value = '';
+  document.getElementById('plantasAvancePrevio').value = '';
+  actualizarResumen();
+  alert(`Avance previo del ${fechaFmt} agregado: ${parseInt(plantasVal).toLocaleString('es-MX')} plantas.`);
+}
+function quitarAvancePrevio(id){
+  if(!confirm('¿Quitar este avance previo del acumulado de la parcela?')) return;
+  const historial = cargarHistorial().filter(r=> r._id !== id);
+  guardarHistorial(historial);
+  actualizarResumen();
+}
+function pintarAvancesPreviosLista(){
+  const cont = document.getElementById('avancesPreviosLista');
+  if(!cont) return;
+  if(!estado.parcela){ cont.innerHTML=''; return; }
+  const previos = cargarHistorial().filter(r=> r.parcela === estado.parcela && r._avancePrevio);
+  if(previos.length===0){ cont.innerHTML=''; return; }
+  previos.sort((a,b)=>{
+    const [da,ma,ya] = a.fechaHora.split(' ')[0].split('/').map(Number);
+    const [db,mb,yb] = b.fechaHora.split(' ')[0].split('/').map(Number);
+    return new Date(ya,ma-1,da) - new Date(yb,mb-1,db);
+  });
+  cont.innerHTML = '<label style="margin-top:6px;">Avances previos cargados</label>' + previos.map(p=>`
+    <div class="historial-item">
+      <div class="top"><span>${p.fechaHora.split(' ')[0]}</span><span>${(parseFloat(p.avanceDiarioManual)||0).toLocaleString('es-MX')} plantas</span></div>
+      <button class="btn btn-danger btn-sm btn-block" onclick="quitarAvancePrevio('${p._id}')" type="button">Quitar este avance previo</button>
+    </div>
+  `).join('');
 }
 
 /* ---------------- Exportar ---------------- */
@@ -1419,7 +1503,7 @@ function nuevaJornada(){
     fechaHora:'', jefeArea:'', supervisor:'', tipoFertilizante:'', parcela:'',
     parcelaIdx:'', hectareas:'', anioPlantacion:'', inventarioParcela:'', ubicacion:null,
     avanceDiarioManual:'', jornaleros:'', pesoCostalDefault: estado.pesoCostalDefault||50,
-    costales:[], muestrasTestigo:[], evidenciasGenerales:[], kml:null,
+    costales:[], muestrasTestigo:[], evidenciasGenerales:[], kmls:[],
     auditor:{nombre:'Jorge López Carranza', firma:null, fecha:''},
     observaciones:'', _editandoHistorialId:null
   };
@@ -1560,17 +1644,19 @@ function construirHtmlResumenDia(fecha){
   const emojiSem = {'sem-verde':'🟢','sem-amarillo':'🟡','sem-rojo':'🔴'}[claseSem] || '';
   const colorSem = claseSem==='sem-verde'?'#2E7D46':claseSem==='sem-amarillo'?'#A87B00':claseSem==='sem-rojo'?'#B4432F':'#2F4A3C';
 
-  // tarjetas por parcela, con su polígono real si tiene KML cargado
+  // tarjetas por parcela, con todos sus polígonos reales si tiene KML(s) cargado(s)
   let html = `<label style="margin:0 0 4px;">Parcelas trabajadas este día (${registros.length})</label>`;
   html += registros.map(r=>{
     const nombre = (r.parcela||'Sin parcela') + (r._esActual?' (actual, sin guardar)':'');
-    const tienePoligono = r.kml && r.kml.puntos && r.kml.puntos.length>=3;
-    const svg = tienePoligono ? construirSvgPoligono(r.kml.puntos, 260, 160) : '';
-    const areaTxt = tienePoligono && r.kml.areaHa ? `≈ ${r.kml.areaHa.toFixed(2)} ha` : '';
+    const kmls = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
+    const poligonos = kmls.filter(k=>k && k.puntos && k.puntos.length>=3).map(k=>{
+      const svg = construirSvgPoligono(k.puntos, 260, 160);
+      const areaTxt = k.areaHa ? `≈ ${k.areaHa.toFixed(2)} ha` : '';
+      return svg + (areaTxt ? `<p class="hint" style="margin:2px 0 0;">${areaTxt}</p>` : '');
+    }).join('');
     return `<div class="parcela-dia-card">
         <div class="parcela-dia-nombre">${nombre}</div>
-        ${svg || '<p class="hint" style="margin:4px 0;">Sin polígono KML cargado.</p>'}
-        ${areaTxt ? `<p class="hint" style="margin:2px 0 0;">${areaTxt}</p>` : ''}
+        ${poligonos || '<p class="hint" style="margin:4px 0;">Sin polígono KML cargado.</p>'}
       </div>`;
   }).join('');
   html += `<div style="clear:both;"></div>`;
@@ -1634,10 +1720,14 @@ function pintarHistorial(){
   }
   cont.innerHTML = filtrado.map(r=>{
     const totalFotos = contarFotosRegistro(r);
+    const etiquetaPrevio = r._avancePrevio ? ' <span class="badge" style="background:var(--ochre);">Avance previo</span>' : '';
+    const subInfo = r._avancePrevio
+      ? `Avance previo cargado manualmente · ${(parseFloat(r.avanceDiarioManual)||0).toLocaleString('es-MX')} plantas`
+      : `Jefe de Área: ${r.jefeArea||'—'} · Supervisor: ${r.supervisor||'—'} · ${(r.costales||[]).length} costales · ${totalFotos} fotos`;
     return `
       <div class="historial-item">
-        <div class="top"><span>${r.parcela || 'Sin parcela'}</span><span>${r.fechaHora || ''}</span></div>
-        <div class="sub">Jefe de Área: ${r.jefeArea||'—'} · Supervisor: ${r.supervisor||'—'} · ${(r.costales||[]).length} costales · ${totalFotos} fotos</div>
+        <div class="top"><span>${r.parcela || 'Sin parcela'}${etiquetaPrevio}</span><span>${r.fechaHora || ''}</span></div>
+        <div class="sub">${subInfo}</div>
         <div class="row2">
           <button class="btn btn-primary btn-sm" onclick="verDetalleRegistro('${r._id}')" type="button">Ver detalle</button>
           <button class="btn btn-danger btn-sm" onclick="borrarRegistroHistorial('${r._id}')" type="button">🗑️ Borrar</button>
@@ -1787,8 +1877,11 @@ function renderDetalleLectura(r){
       r.evidenciasGenerales.map((ev,i)=>`<div><img src="${ev.dataUrl}"><div class="cap">Evidencia #${i+1}<br><button onclick="descargarFoto('${ev.dataUrl}','evidencia_general_${i+1}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div>`).join('') + `</div></div>`;
   }
 
-  if(r.kml){
-    html += `<div class="detalle-section"><h3>Polígono KML</h3><p style="font-size:13px;">${r.kml.placemark||r.kml.archivo}${r.kml.areaHa? ' · ≈'+r.kml.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(r.kml.puntos)}</div>`;
+  const kmlsReg = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
+  if(kmlsReg.length){
+    html += `<div class="detalle-section"><h3>Polígonos KML (${kmlsReg.length})</h3>` +
+      kmlsReg.map(k=>`<p style="font-size:13px;margin:6px 0 2px;">${k.placemark||k.archivo}${k.areaHa? ' · ≈'+k.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(k.puntos)}`).join('') +
+      `</div>`;
   }
 
   html += `<div class="detalle-section"><h3>Observaciones</h3><p style="font-size:13px;">${r.observaciones||'—'}</p></div>`;
@@ -1899,7 +1992,12 @@ function generarPdfRegistro(r){
     <h2>Evidencias fotográficas</h2>
     <div class="fotos">${fotosHtml || '<p>Sin fotografías registradas.</p>'}</div>
 
-    ${r.kml ? `<h2>Polígono de trabajo</h2><p>${r.kml.placemark||r.kml.archivo}${r.kml.areaHa? ' · área aproximada '+r.kml.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(r.kml.puntos)}` : ''}
+    ${(()=>{
+      const kmlsPdf = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
+      if(!kmlsPdf.length) return '';
+      return `<h2>Polígonos de trabajo (${kmlsPdf.length})</h2>` +
+        kmlsPdf.map(k=>`<p>${k.placemark||k.archivo}${k.areaHa? ' · área aproximada '+k.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(k.puntos)}`).join('');
+    })()}
 
     <h2>Observaciones</h2>
     <p>${(r.observaciones||'—').replace(/\n/g,'<br>')}</p>
@@ -1958,50 +2056,57 @@ function pintarGaleriaGeneral(){
 
 /* ---------------- Polígono KML ---------------- */
 function onKmlInput(inputEl){
-  const file = inputEl.files && inputEl.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const texto = e.target.result;
-    let nombre = file.name, placemark = '', vertices = 0, areaHa = null, puntos = [];
-    try{
-      const xml = new DOMParser().parseFromString(texto, 'text/xml');
-      const nombreNode = xml.querySelector('Placemark > name') || xml.querySelector('name');
-      if(nombreNode) placemark = nombreNode.textContent.trim();
-      const coordNode = xml.querySelector('coordinates');
-      if(coordNode){
-        const pares = coordNode.textContent.trim().split(/\s+/).map(p=>p.split(',').map(Number)).filter(p=>p.length>=2 && !isNaN(p[0]) && !isNaN(p[1]));
-        vertices = pares.length;
-        puntos = pares.map(p=>[p[0], p[1]]); // [lon, lat]
-        if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
+  const files = inputEl.files;
+  if(!files || files.length===0) return;
+  let pendientes = files.length;
+  Array.from(files).forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const texto = e.target.result;
+      let nombre = file.name, placemark = '', vertices = 0, areaHa = null, puntos = [];
+      try{
+        const xml = new DOMParser().parseFromString(texto, 'text/xml');
+        const nombreNode = xml.querySelector('Placemark > name') || xml.querySelector('name');
+        if(nombreNode) placemark = nombreNode.textContent.trim();
+        const coordNode = xml.querySelector('coordinates');
+        if(coordNode){
+          const pares = coordNode.textContent.trim().split(/\s+/).map(p=>p.split(',').map(Number)).filter(p=>p.length>=2 && !isNaN(p[0]) && !isNaN(p[1]));
+          vertices = pares.length;
+          puntos = pares.map(p=>[p[0], p[1]]); // [lon, lat]
+          if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
+        }
+      }catch(err){ console.error('No se pudo leer el KML', err); }
+      estado.kmls.push({archivo: nombre, placemark, vertices, areaHa, puntos});
+      pendientes--;
+      if(pendientes===0){
+        pintarKmlInfo();
+        guardar();
+        pintarResumenDiaPrincipal();
       }
-    }catch(err){ console.error('No se pudo leer el KML', err); }
-    estado.kml = {archivo: nombre, placemark, vertices, areaHa, puntos};
-    pintarKmlInfo();
-    guardar();
-    pintarResumenDiaPrincipal();
-  };
-  reader.readAsText(file);
+    };
+    reader.readAsText(file);
+  });
   inputEl.value = '';
 }
-function quitarKml(){
-  estado.kml = null;
+function quitarKml(idx){
+  estado.kmls.splice(idx,1);
   pintarKmlInfo();
   guardar();
   pintarResumenDiaPrincipal();
 }
 function pintarKmlInfo(){
   const cont = document.getElementById('kmlInfo');
-  if(!estado.kml){ cont.innerHTML=''; return; }
-  const k = estado.kml;
-  const svg = construirSvgPoligono(k.puntos);
-  cont.innerHTML = `
+  if(!estado.kmls || estado.kmls.length===0){ cont.innerHTML=''; return; }
+  cont.innerHTML = estado.kmls.map((k, idx)=>{
+    const svg = construirSvgPoligono(k.puntos);
+    return `
     <div class="kml-card">
       <b>${k.placemark || k.archivo}</b>
       Archivo: ${k.archivo}${k.vertices ? ' · '+k.vertices+' vértices' : ''}${k.areaHa ? ' · ≈ '+k.areaHa.toFixed(2)+' ha' : ''}
       ${svg}
-      <div class="kml-remove"><button class="btn btn-danger btn-sm" onclick="quitarKml()" type="button">Quitar polígono</button></div>
+      <div class="kml-remove"><button class="btn btn-danger btn-sm" onclick="quitarKml(${idx})" type="button">Quitar este polígono</button></div>
     </div>`;
+  }).join('');
 }
 // Área aproximada de un polígono lat/lon (proyección equirectangular simple), en hectáreas
 function areaPoligonoHa(pares){
