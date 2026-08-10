@@ -1116,19 +1116,58 @@ function compressImage(file, cb){
   reader.onload = function(e){
     const img = new Image();
     img.onload = function(){
-      const maxW = 900;
-      let w = img.width, h = img.height;
-      if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-      guardarFotoEnDispositivo(dataUrl);
-      cb(dataUrl);
+      obtenerCoordsParaMarcador(function(coordsTexto){
+        const maxW = 900;
+        let w = img.width, h = img.height;
+        if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        if(coordsTexto){ dibujarMarcadorGeo(ctx, w, h, coordsTexto); }
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        guardarFotoEnDispositivo(dataUrl);
+        cb(dataUrl);
+      });
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+// Obtiene coordenadas rápidas del GPS para marcar la foto (usa una posición reciente en caché si ya se tiene,
+// y no bloquea la captura más de ~4 segundos si el GPS tarda o no está disponible).
+function obtenerCoordsParaMarcador(cb){
+  if(!navigator.geolocation){ cb(null); return; }
+  let resuelto = false;
+  const limite = setTimeout(()=>{ if(!resuelto){ resuelto = true; cb(null); } }, 4000);
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      if(resuelto) return;
+      resuelto = true; clearTimeout(limite);
+      cb(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+    },
+    ()=>{ if(resuelto) return; resuelto = true; clearTimeout(limite); cb(null); },
+    {enableHighAccuracy:true, timeout:3800, maximumAge:60000}
+  );
+}
+// Imprime un marcador "📍 lat, lon" en la esquina inferior derecha de la foto, para ubicarla fácilmente después
+function dibujarMarcadorGeo(ctx, w, h, coordsTexto){
+  const texto = '📍 ' + coordsTexto;
+  const fontSize = Math.max(14, Math.round(w * 0.032));
+  ctx.font = `700 ${fontSize}px Arial, sans-serif`;
+  const padding = Math.round(fontSize * 0.55);
+  const textW = ctx.measureText(texto).width;
+  const boxW = textW + padding*2;
+  const boxH = fontSize + padding*1.5;
+  const boxX = w - boxW - 10;
+  const boxY = h - boxH - 10;
+  ctx.fillStyle = 'rgba(47,74,60,0.82)';
+  ctx.beginPath();
+  if(ctx.roundRect){ ctx.roundRect(boxX, boxY, boxW, boxH, 8); } else { ctx.rect(boxX, boxY, boxW, boxH); }
+  ctx.fill();
+  ctx.fillStyle = '#F3F1E7';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(texto, boxX + padding, boxY + boxH/2 + 1);
 }
 // Guarda automáticamente cada evidencia en el dispositivo (Descargas/Galería), independiente de la app,
 // para que la fotografía no se pierda aunque falle el formulario o el navegador.
@@ -1682,9 +1721,9 @@ function construirHtmlResumenDia(fecha){
     const nombre = (r.parcela||'Sin parcela') + (r._esActual?' (actual, sin guardar)':'');
     const kmls = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
     const poligonos = kmls.filter(k=>k && k.puntos && k.puntos.length>=3).map(k=>{
-      const svg = construirSvgPoligono(k.puntos, 260, 160);
+      const visual = k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos, 260, 160);
       const areaTxt = k.areaHa ? `≈ ${k.areaHa.toFixed(2)} ha` : '';
-      return svg + (areaTxt ? `<p class="hint" style="margin:2px 0 0;">${areaTxt}</p>` : '');
+      return visual + (areaTxt ? `<p class="hint" style="margin:2px 0 0;">${areaTxt}</p>` : '');
     }).join('');
     return `<div class="parcela-dia-card">
         <div class="parcela-dia-nombre">${nombre}</div>
@@ -1912,7 +1951,7 @@ function renderDetalleLectura(r){
   const kmlsReg = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
   if(kmlsReg.length){
     html += `<div class="detalle-section"><h3>Polígonos KML (${kmlsReg.length})</h3>` +
-      kmlsReg.map(k=>`<p style="font-size:13px;margin:6px 0 2px;">${k.placemark||k.archivo}${k.areaHa? ' · ≈'+k.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(k.puntos)}`).join('') +
+      kmlsReg.map(k=>`<p style="font-size:13px;margin:6px 0 2px;">${k.placemark||k.archivo}${k.areaHa? ' · ≈'+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('') +
       `</div>`;
   }
 
@@ -2028,7 +2067,7 @@ function generarPdfRegistro(r){
       const kmlsPdf = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
       if(!kmlsPdf.length) return '';
       return `<h2>Polígonos de trabajo (${kmlsPdf.length})</h2>` +
-        kmlsPdf.map(k=>`<p>${k.placemark||k.archivo}${k.areaHa? ' · área aproximada '+k.areaHa.toFixed(2)+' ha':''}</p>${construirSvgPoligono(k.puntos)}`).join('');
+        kmlsPdf.map(k=>`<p>${k.placemark||k.archivo}${k.areaHa? ' · área aproximada '+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('');
     })()}
 
     <h2>Observaciones</h2>
@@ -2108,12 +2147,24 @@ function onKmlInput(inputEl){
           if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
         }
       }catch(err){ console.error('No se pudo leer el KML', err); }
-      estado.kmls.push({archivo: nombre, placemark, vertices, areaHa, puntos});
+      const kmlObj = {archivo: nombre, placemark, vertices, areaHa, puntos, satelite: null, bboxSatelital: null};
+      estado.kmls.push(kmlObj);
       pendientes--;
       if(pendientes===0){
         pintarKmlInfo();
         guardar();
         pintarResumenDiaPrincipal();
+      }
+      // intenta cargar una imagen satelital de fondo (requiere internet en este momento);
+      // si no hay conexión o falla, el polígono se sigue mostrando en su dibujo esquemático.
+      if(puntos.length>=3){
+        const bbox = calcularBBoxPadded(puntos, 0.18);
+        obtenerImagenSatelital(bbox, 640, 420).then(dataUrl=>{
+          kmlObj.satelite = dataUrl;
+          kmlObj.bboxSatelital = bbox;
+          guardar();
+          pintarKmlInfo();
+        }).catch(()=>{ /* sin internet o el servicio satelital no respondió a tiempo */ });
       }
     };
     reader.readAsText(file);
@@ -2130,15 +2181,63 @@ function pintarKmlInfo(){
   const cont = document.getElementById('kmlInfo');
   if(!estado.kmls || estado.kmls.length===0){ cont.innerHTML=''; return; }
   cont.innerHTML = estado.kmls.map((k, idx)=>{
-    const svg = construirSvgPoligono(k.puntos);
+    const visual = k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos);
     return `
     <div class="kml-card">
       <b>${k.placemark || k.archivo}</b>
       Archivo: ${k.archivo}${k.vertices ? ' · '+k.vertices+' vértices' : ''}${k.areaHa ? ' · ≈ '+k.areaHa.toFixed(2)+' ha' : ''}
-      ${svg}
+      ${visual}
+      ${!k.satelite ? '<p class="hint" style="margin:4px 0 0;">Conéctate a internet una vez para cargar la imagen satelital de fondo; mientras tanto se muestra un dibujo esquemático.</p>' : ''}
       <div class="kml-remove"><button class="btn btn-danger btn-sm" onclick="quitarKml(${idx})" type="button">Quitar este polígono</button></div>
     </div>`;
   }).join('');
+}
+// Calcula el rectángulo (bounding box) del polígono con un margen alrededor, en grados lon/lat
+function calcularBBoxPadded(puntos, paddingFrac){
+  const lons = puntos.map(p=>p[0]), lats = puntos.map(p=>p[1]);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const spanLon = (maxLon-minLon) || 0.0008;
+  const spanLat = (maxLat-minLat) || 0.0008;
+  const padLon = spanLon * paddingFrac;
+  const padLat = spanLat * paddingFrac;
+  return {minLon:minLon-padLon, maxLon:maxLon+padLon, minLat:minLat-padLat, maxLat:maxLat+padLat};
+}
+// Descarga una imagen satelital pública (Esri World Imagery, sin necesidad de llave/API key) para el bbox dado
+function obtenerImagenSatelital(bbox, w, h){
+  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}&bboxSR=4326&imageSR=4326&size=${w},${h}&format=png24&transparent=false&f=image`;
+  return fetch(url).then(resp=>{
+    if(!resp.ok) throw new Error('respuesta no válida del servicio satelital');
+    return resp.blob();
+  }).then(blob=> new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  }));
+}
+// Dibuja el contorno del polígono alineado sobre el bbox exacto usado para pedir la imagen satelital
+function construirSvgOverlayBBox(puntos, bbox, w, h){
+  const spanLon = (bbox.maxLon-bbox.minLon) || 1;
+  const spanLat = (bbox.maxLat-bbox.minLat) || 1;
+  const pts = puntos.map(p=>{
+    const x = ((p[0]-bbox.minLon)/spanLon) * w;
+    const y = h - ((p[1]-bbox.minLat)/spanLat) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<polygon points="${pts}" fill="#FFEB3B" fill-opacity="0.18" stroke="#FFEB3B" stroke-width="3" stroke-linejoin="round"/>`;
+}
+// Construye la vista con imagen satelital de fondo + el polígono dibujado encima
+function construirVistaSatelital(k){
+  const w = 640, h = 420;
+  const overlay = construirSvgOverlayBBox(k.puntos, k.bboxSatelital, w, h);
+  return `<div style="position:relative;max-width:320px;margin:10px auto 4px;border:1px solid #d8d8c8;border-radius:8px;overflow:hidden;">
+    <img src="${k.satelite}" style="width:100%;display:block;" alt="Imagen satelital del polígono">
+    <svg viewBox="0 0 ${w} ${h}" style="position:absolute;top:0;left:0;width:100%;height:100%;">
+      ${overlay}
+      <text x="${w-10}" y="20" font-size="14" font-weight="700" text-anchor="end" fill="#fff" style="paint-order:stroke;stroke:#000;stroke-width:3px;">N ↑</text>
+    </svg>
+  </div>`;
 }
 // Área aproximada de un polígono lat/lon (proyección equirectangular simple), en hectáreas
 function areaPoligonoHa(pares){
