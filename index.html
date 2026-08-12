@@ -2401,7 +2401,7 @@ function mostrarDiagnostico(){
       partes.push('Service Worker registrado: ' + (reg ? 'Sí ✅' : 'No ⚠️ (necesita abrir una vez con internet)'));
       partes.push('Página controlada por el Service Worker ahora: ' + (navigator.serviceWorker.controller ? 'Sí ✅' : 'No ⚠️'));
       if('caches' in window){
-        caches.open('agave-reporte-cache-v2').then(cache=> cache.keys()).then(keys=>{
+        caches.open('agave-reporte-cache-v3').then(cache=> cache.keys()).then(keys=>{
           partes.push('Archivos guardados en caché offline: ' + keys.length);
           alert(partes.join('\n'));
         });
