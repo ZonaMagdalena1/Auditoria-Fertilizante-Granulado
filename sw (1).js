@@ -1,9 +1,8 @@
-
 // Service Worker - Consolidación de Agave (formularios de campo)
 // Guarda una copia local de la página para que abra sin conexión a internet,
 // incluso si la conexión está presente pero muy lenta o intermitente.
 
-const CACHE_NAME = 'agave-reporte-cache-v2';
+const CACHE_NAME = 'agave-reporte-cache-v3';
 const ARCHIVOS_A_GUARDAR = [
   './',
   './index.html',
@@ -11,13 +10,18 @@ const ARCHIVOS_A_GUARDAR = [
 ];
 const TIEMPO_LIMITE_RED_MS = 4000; // si la red tarda más que esto, se usa la copia guardada
 
-// Al instalar: guarda una copia de la(s) página(s) del formulario
+// Al instalar: guarda una copia de la(s) página(s) del formulario.
+// Usa {cache:'reload'} para no quedarse con una copia vieja atorada en la caché del navegador.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return Promise.all(
         ARCHIVOS_A_GUARDAR.map((archivo) =>
-          cache.add(archivo).catch(() => { /* si un archivo no existe en este repositorio, se ignora */ })
+          fetch(archivo, { cache: 'reload' })
+            .then((respuesta) => {
+              if (respuesta && respuesta.ok) return cache.put(archivo, respuesta);
+            })
+            .catch(() => { /* si un archivo no existe en este repositorio, se ignora */ })
         )
       );
     })
@@ -52,8 +56,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     conTiempoLimite(fetch(event.request), TIEMPO_LIMITE_RED_MS)
       .then((respuestaRed) => {
-        const copia = respuestaRed.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copia));
+        if (respuestaRed && respuestaRed.ok) {
+          const copia = respuestaRed.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copia));
+        }
         return respuestaRed;
       })
       .catch(() =>
