@@ -470,6 +470,7 @@
   <h1>Reporte de aplicación</h1>
   <p class="sub" id="subHeader">Aplicación de fertilizante granulado — captura de campo</p>
   <button class="btn btn-ghost btn-sm no-print" id="installBtn" onclick="instalarApp()" style="margin-top:10px;">📲 Agregar a pantalla de inicio</button>
+  <button class="btn btn-ghost btn-sm no-print" onclick="mostrarDiagnostico()" style="margin-top:6px;" type="button">🔧 Diagnóstico sin conexión</button>
   <p class="hint no-print" style="color:var(--sage-pale);opacity:.85;margin-top:6px;">Para instalar, primero descarga este archivo y ábrelo directo en Chrome o Safari de tu teléfono.</p>
 </div>
 
@@ -1136,19 +1137,32 @@ function compressImage(file, cb){
 }
 // Obtiene coordenadas rápidas del GPS para marcar la foto (usa una posición reciente en caché si ya se tiene,
 // y no bloquea la captura más de ~4 segundos si el GPS tarda o no está disponible).
+let _ultimaUbicacionConocida = null;
 function obtenerCoordsParaMarcador(cb){
-  if(!navigator.geolocation){ cb(null); return; }
+  if(!navigator.geolocation){
+    cb(_coordsDeRespaldo());
+    return;
+  }
   let resuelto = false;
-  const limite = setTimeout(()=>{ if(!resuelto){ resuelto = true; cb(null); } }, 4000);
+  const limite = setTimeout(()=>{ if(!resuelto){ resuelto = true; cb(_coordsDeRespaldo()); } }, 8000);
   navigator.geolocation.getCurrentPosition(
     pos=>{
       if(resuelto) return;
       resuelto = true; clearTimeout(limite);
-      cb(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+      const texto = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+      _ultimaUbicacionConocida = texto;
+      cb(texto);
     },
-    ()=>{ if(resuelto) return; resuelto = true; clearTimeout(limite); cb(null); },
-    {enableHighAccuracy:true, timeout:3800, maximumAge:60000}
+    ()=>{ if(resuelto) return; resuelto = true; clearTimeout(limite); cb(_coordsDeRespaldo()); },
+    {enableHighAccuracy:true, timeout:7800, maximumAge:300000}
   );
+}
+// Si no se pudo obtener el GPS a tiempo para esta foto, usa la última ubicación que sí se logró
+// (de una foto anterior o de la ubicación general capturada al inicio de la jornada), en vez de dejarla sin marcador.
+function _coordsDeRespaldo(){
+  if(_ultimaUbicacionConocida) return _ultimaUbicacionConocida;
+  if(estado.ubicacion && estado.ubicacion.lat && estado.ubicacion.lon) return `${estado.ubicacion.lat}, ${estado.ubicacion.lon}`;
+  return null;
 }
 // Imprime un marcador "📍 lat, lon" en la esquina inferior derecha de la foto, para ubicarla fácilmente después
 function dibujarMarcadorGeo(ctx, w, h, coordsTexto){
@@ -2205,6 +2219,7 @@ function calcularBBoxPadded(puntos, paddingFrac){
 }
 // Descarga una imagen satelital pública (Esri World Imagery, sin necesidad de llave/API key) para el bbox dado
 function obtenerImagenSatelital(bbox, w, h){
+  if(!navigator.onLine) return Promise.reject(new Error('sin conexión'));
   const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}&bboxSR=4326&imageSR=4326&size=${w},${h}&format=png24&transparent=false&f=image`;
   return fetch(url).then(resp=>{
     if(!resp.ok) throw new Error('respuesta no válida del servicio satelital');
@@ -2364,6 +2379,41 @@ window.addEventListener('beforeinstallprompt', (e)=>{
 function estaEnVistaPreviaEmbebida(){
   try{ return window.self !== window.top; }catch(e){ return true; }
 }
+
+// Muestra información técnica para diagnosticar por qué el modo sin conexión no está funcionando
+function mostrarDiagnostico(){
+  const partes = [];
+  partes.push('Conexión ahora mismo: ' + (navigator.onLine ? 'CON internet' : 'SIN internet'));
+  partes.push('Dirección segura (https): ' + (esContextoSeguro() ? 'Sí' : 'No ⚠️'));
+  partes.push('Vista embebida (chat/preview): ' + (estaEnVistaPreviaEmbebida() ? 'Sí ⚠️' : 'No'));
+  partes.push('Service Worker soportado: ' + ('serviceWorker' in navigator ? 'Sí' : 'No ⚠️'));
+
+  let guardadoOk = false;
+  try{
+    localStorage.setItem('_test_diag', '1');
+    guardadoOk = localStorage.getItem('_test_diag') === '1';
+    localStorage.removeItem('_test_diag');
+  }catch(e){ guardadoOk = false; }
+  partes.push('Guardado local (localStorage): ' + (guardadoOk ? 'Funciona ✅' : 'BLOQUEADO ⚠️'));
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistration().then(reg=>{
+      partes.push('Service Worker registrado: ' + (reg ? 'Sí ✅' : 'No ⚠️ (necesita abrir una vez con internet)'));
+      partes.push('Página controlada por el Service Worker ahora: ' + (navigator.serviceWorker.controller ? 'Sí ✅' : 'No ⚠️'));
+      if('caches' in window){
+        caches.open('agave-reporte-cache-v2').then(cache=> cache.keys()).then(keys=>{
+          partes.push('Archivos guardados en caché offline: ' + keys.length);
+          alert(partes.join('\n'));
+        });
+      }else{
+        alert(partes.join('\n'));
+      }
+    });
+  }else{
+    alert(partes.join('\n'));
+  }
+}
+
 
 function instalarApp(){
   if(estaEnVistaPreviaEmbebida()){
