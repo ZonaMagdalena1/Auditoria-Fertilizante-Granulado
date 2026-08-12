@@ -1,3 +1,4 @@
+
 // Service Worker - Consolidación de Agave (formularios de campo)
 // Guarda una copia local de la página para que abra sin conexión a internet,
 // incluso si la conexión está presente pero muy lenta o intermitente.
