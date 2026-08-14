@@ -28,7 +28,7 @@
     --radius: 10px;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;overscroll-behavior-y:contain;}
   body{
     background:var(--cream);
     color:var(--ink);
@@ -471,6 +471,7 @@
   <p class="sub" id="subHeader">Aplicación de fertilizante granulado — captura de campo</p>
   <button class="btn btn-ghost btn-sm no-print" id="installBtn" onclick="instalarApp()" style="margin-top:10px;">📲 Agregar a pantalla de inicio</button>
   <button class="btn btn-ghost btn-sm no-print" onclick="mostrarDiagnostico()" style="margin-top:6px;" type="button">🔧 Diagnóstico sin conexión</button>
+  <button class="btn btn-ghost btn-sm no-print" onclick="liberarEspacio()" style="margin-top:6px;" type="button">🧹 Liberar espacio</button>
   <p class="hint no-print" style="color:var(--sage-pale);opacity:.85;margin-top:6px;">Para instalar, primero descarga este archivo y ábrelo directo en Chrome o Safari de tu teléfono.</p>
 </div>
 
@@ -550,6 +551,15 @@
   <div class="card">
     <h2><span class="n">3</span>Evidencias, muestras testigo y polígono</h2>
 
+    <div id="etiquetaSupervisorBox" style="display:none;background:var(--sage-pale);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+      <label class="first" style="margin-top:0;">¿De qué supervisor son las próximas evidencias y polígonos que subas?</label>
+      <div class="row2">
+        <button class="btn" id="btnSupActivo1" onclick="cambiarSupervisorActivo(1)" type="button">Supervisor 1</button>
+        <button class="btn" id="btnSupActivo2" onclick="cambiarSupervisorActivo(2)" type="button">Supervisor 2</button>
+      </div>
+      <p class="hint" style="margin-bottom:0;">Cada foto y polígono queda marcado con esta etiqueta para separarlos por supervisor.</p>
+    </div>
+
     <label class="first">Muestras testigo (plantas marcadas con aerosol) — antes / después</label>
     <p class="hint" style="margin-top:-2px;">Marca algunas plantas con aerosol antes de aplicar, fotografíalas, y vuelve a fotografiarlas una vez terminada la aplicación de fertilizante para comparar el antes y el después.</p>
     <button class="btn btn-primary btn-block" style="margin-top:8px;" onclick="agregarMuestraTestigo()">+ Agregar muestra testigo</button>
@@ -603,17 +613,55 @@
   <div class="card">
     <h2><span class="n">5</span>Avance diario y jornales</h2>
 
-    <label class="first">Avance diario en plantas fertilizadas</label>
-    <input type="number" id="avanceDiario" min="0" placeholder="0">
-    <p class="hint" id="avanceDiarioHint">Captura aquí manualmente el total de plantas fertilizadas en el día.</p>
+    <label class="first" style="display:flex;align-items:center;gap:8px;font-weight:600;">
+      <input type="checkbox" id="dosSupervisoresCheck" onchange="onDosSupervisoresChange(this.checked)" style="width:auto;">
+      Trabajar con 2 supervisores en esta parcela hoy
+    </label>
+    <p class="hint" style="margin-top:2px;">Actívalo si dos supervisores están trabajando distintas hectáreas de la misma parcela en la misma jornada.</p>
 
-    <label>Número de jornales requeridos</label>
-    <input type="number" id="jornalerosReq" min="0" placeholder="Ej. 6">
+    <div id="unSupervisorBox">
+      <label class="first">Avance diario en plantas fertilizadas</label>
+      <input type="number" id="avanceDiario" min="0" placeholder="0">
+      <p class="hint" id="avanceDiarioHint">Captura aquí manualmente el total de plantas fertilizadas en el día.</p>
+
+      <label>Número de jornales requeridos</label>
+      <input type="number" id="jornalerosReq" min="0" placeholder="Ej. 6">
+    </div>
+
+    <div id="dosSupervisoresBox" style="display:none;">
+      <label class="first">Densidad de plantación (plantas por hectárea)</label>
+      <input type="number" id="densidadPlantacion" min="0" placeholder="Ej. 1100" onchange="densidadPlantacionCambio(this.value)">
+      <p class="hint">Se usa para calcular las plantas fertilizadas a partir de las hectáreas trabajadas por cada supervisor.</p>
+
+      <div class="resumen-dia-box" style="margin-top:10px;">
+        <label class="first" style="margin-top:0;">Supervisor 1 (el de la sección 1)</label>
+        <div class="row2">
+          <div><label class="first">Hectáreas trabajadas</label><input type="number" id="hectareasSup1" min="0" step="0.01" oninput="datosSupervisorCambio(1,'hectareas',this.value)"></div>
+          <div><label class="first">Jornales</label><input type="number" id="jornalesSup1" min="0" oninput="datosSupervisorCambio(1,'jornaleros',this.value)"></div>
+        </div>
+        <div id="statsSup1" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="resumen-dia-box" style="margin-top:10px;">
+        <label class="first" style="margin-top:0;">Supervisor 2</label>
+        <select id="supervisorSelect2" onchange="onSupervisor2Change(this.value)"></select>
+        <div class="row2" style="margin-top:8px;">
+          <div><label class="first">Hectáreas trabajadas</label><input type="number" id="hectareasSup2" min="0" step="0.01" oninput="datosSupervisorCambio(2,'hectareas',this.value)"></div>
+          <div><label class="first">Jornales</label><input type="number" id="jornalesSup2" min="0" oninput="datosSupervisorCambio(2,'jornaleros',this.value)"></div>
+        </div>
+        <div id="statsSup2" style="margin-top:8px;"></div>
+      </div>
+      <div class="stat-fila" style="border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:10px;">
+        <span><b>Total de hectáreas trabajadas hoy (ambos supervisores)</b></span>
+        <b id="totalHectareasSups">0</b>
+      </div>
+      <p class="hint" style="margin-top:8px;">El avance diario total (para el acumulado de la parcela) se calcula sumando el de ambos supervisores automáticamente.</p>
+    </div>
 
     <div class="summary-grid" style="margin-top:12px;">
       <div class="stat" id="statRendimiento">
         <div class="v" id="avanceRendimiento">—</div>
-        <div class="l">Plantas por jornal</div>
+        <div class="l">Plantas por jornal (combinado)</div>
       </div>
       <div class="stat progress">
         <div class="v" id="avanceFaltante">0</div>
@@ -869,6 +917,12 @@ let estado = {
   ubicacion: null,
   avanceDiarioManual: '',
   jornaleros: '',
+  dosSupervisores: false,
+  supervisor2: '', supervisor2Idx: '',
+  densidadPlantacion: '',
+  hectareasSup1: '', jornalesSup1: '',
+  hectareasSup2: '', jornalesSup2: '',
+  evidenciaSupervisorActivo: 1,
   pesoCostalDefault: 50,
   costales: [],           // {numero, hora, peso, aplicadoPor, evidenciaFoto}
   muestrasTestigo: [],    // {numero, antes, despues}
@@ -884,6 +938,7 @@ function fmtFechaHora(d){
   const p = n => String(n).padStart(2,'0');
   return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+let _avisoEspacioMostrado = false;
 function guardar(){
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
@@ -891,6 +946,10 @@ function guardar(){
     f.style.opacity = 1;
   }catch(e){
     console.error('No se pudo guardar localmente', e);
+    if(!_avisoEspacioMostrado){
+      _avisoEspacioMostrado = true;
+      alert('⚠️ El navegador no tiene más espacio para guardar (esto es un límite del navegador, no del almacenamiento real de tu teléfono). Los últimos cambios podrían no haberse guardado.\n\nSolución: toca "🔧 Diagnóstico sin conexión" y luego "🧹 Liberar espacio" para exportar un respaldo y borrar historial antiguo.');
+    }
   }
 }
 function cargar(){
@@ -943,6 +1002,19 @@ function iniciar(){
   // --- Jefe de Área / Supervisor selects ---
   poblarSelectRol(document.getElementById('jefeAreaSelect'), cargarCatalogo(KEY_CATALOGO_JEFES, DEFAULT_JEFES), estado.jefeArea);
   poblarSelectRol(document.getElementById('supervisorSelect'), cargarCatalogo(KEY_CATALOGO_SUPERVISORES, DEFAULT_SUPERVISORES), estado.supervisor);
+  poblarSelectRol(document.getElementById('supervisorSelect2'), cargarCatalogo(KEY_CATALOGO_SUPERVISORES, DEFAULT_SUPERVISORES), estado.supervisor2);
+
+  // --- Modo 2 supervisores ---
+  document.getElementById('dosSupervisoresCheck').checked = !!estado.dosSupervisores;
+  document.getElementById('unSupervisorBox').style.display = estado.dosSupervisores ? 'none' : 'block';
+  document.getElementById('dosSupervisoresBox').style.display = estado.dosSupervisores ? 'block' : 'none';
+  document.getElementById('densidadPlantacion').value = estado.densidadPlantacion || '';
+  document.getElementById('hectareasSup1').value = estado.hectareasSup1 || '';
+  document.getElementById('jornalesSup1').value = estado.jornalesSup1 || '';
+  document.getElementById('hectareasSup2').value = estado.hectareasSup2 || '';
+  document.getElementById('jornalesSup2').value = estado.jornalesSup2 || '';
+  document.getElementById('etiquetaSupervisorBox').style.display = estado.dosSupervisores ? 'block' : 'none';
+  pintarBotonesSupervisorActivo();
 
   // --- Parcela select ---
   const pSel = document.getElementById('parcelaSelect');
@@ -1030,6 +1102,63 @@ function onSupervisorChange(v){
     estado.supervisor = v;
   }
   guardar();
+  actualizarResumen();
+}
+function onSupervisor2Change(v){
+  const selectEl = document.getElementById('supervisorSelect2');
+  if(v === '__nuevo__'){
+    const nombre = (prompt('Nombre completo del Supervisor 2:') || '').trim();
+    const catalogo = cargarCatalogo(KEY_CATALOGO_SUPERVISORES, DEFAULT_SUPERVISORES);
+    if(nombre){
+      if(!catalogo.includes(nombre)){ catalogo.push(nombre); guardarCatalogo(KEY_CATALOGO_SUPERVISORES, catalogo); }
+      estado.supervisor2 = nombre;
+    }else{
+      estado.supervisor2 = '';
+    }
+    poblarSelectRol(selectEl, catalogo, estado.supervisor2);
+  }else{
+    estado.supervisor2 = v;
+  }
+  guardar();
+  actualizarResumen();
+}
+// Activa/desactiva el modo de 2 supervisores trabajando la misma parcela
+function onDosSupervisoresChange(checked){
+  estado.dosSupervisores = checked;
+  document.getElementById('unSupervisorBox').style.display = checked ? 'none' : 'block';
+  document.getElementById('dosSupervisoresBox').style.display = checked ? 'block' : 'none';
+  document.getElementById('etiquetaSupervisorBox').style.display = checked ? 'block' : 'none';
+  if(!checked){
+    document.getElementById('avanceDiario').value = estado.avanceDiarioManual || '';
+  }else{
+    pintarBotonesSupervisorActivo();
+  }
+  guardar();
+  actualizarResumen();
+}
+function cambiarSupervisorActivo(num){
+  estado.evidenciaSupervisorActivo = num;
+  pintarBotonesSupervisorActivo();
+  guardar();
+}
+function pintarBotonesSupervisorActivo(){
+  const b1 = document.getElementById('btnSupActivo1');
+  const b2 = document.getElementById('btnSupActivo2');
+  if(!b1 || !b2) return;
+  b1.className = 'btn ' + (estado.evidenciaSupervisorActivo===1 ? 'btn-primary' : 'btn-ghost');
+  b2.className = 'btn ' + (estado.evidenciaSupervisorActivo===2 ? 'btn-primary' : 'btn-ghost');
+}
+function densidadPlantacionCambio(valor){
+  estado.densidadPlantacion = valor;
+  guardar();
+  actualizarResumen();
+}
+// Guarda las hectáreas u jornales capturados para el supervisor 1 o 2
+function datosSupervisorCambio(numSup, campo, valor){
+  const key = (campo==='hectareas' ? 'hectareasSup' : 'jornalesSup') + numSup;
+  estado[key] = valor;
+  guardar();
+  actualizarResumen();
 }
 
 function onParcelaChange(v){
@@ -1118,7 +1247,7 @@ function compressImage(file, cb){
     const img = new Image();
     img.onload = function(){
       obtenerCoordsParaMarcador(function(coordsTexto){
-        const maxW = 900;
+        const maxW = 680;
         let w = img.width, h = img.height;
         if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
         const canvas = document.createElement('canvas');
@@ -1126,7 +1255,7 @@ function compressImage(file, cb){
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
         if(coordsTexto){ dibujarMarcadorGeo(ctx, w, h, coordsTexto); }
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.45);
         guardarFotoEnDispositivo(dataUrl);
         cb(dataUrl);
       });
@@ -1192,7 +1321,7 @@ function guardarFotoEnDispositivo(dataUrl){
   }catch(e){ /* si el navegador bloquea la descarga automática, la foto sigue guardada dentro del reporte */ }
 }
 function abrirNuevoCostal(){
-  const numero = estado.costales.length + 1;
+  const numero = obtenerSiguienteNumeroCostal();
   const ultimoAplicador = (()=>{ try{ return localStorage.getItem('fert_ultimo_aplicador') || ''; }catch(e){ return ''; } })();
   estado.costales.push({
     numero,
@@ -1205,9 +1334,21 @@ function abrirNuevoCostal(){
   actualizarResumen();
   guardar();
 }
+// El número de costal sigue un consecutivo por parcela: si ya se registraron costales en jornadas
+// anteriores de la misma parcela, continúa desde ahí en vez de reiniciar en 1 cada jornada nueva.
+function obtenerSiguienteNumeroCostal(){
+  let maxNum = 0;
+  estado.costales.forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; });
+  if(estado.parcela){
+    const historial = cargarHistorial().filter(r=> r.parcela === estado.parcela && r._id !== estado._editandoHistorialId);
+    historial.forEach(r=>{
+      (r.costales||[]).forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; });
+    });
+  }
+  return maxNum + 1;
+}
 function quitarCostal(idx){
   estado.costales.splice(idx,1);
-  estado.costales.forEach((c,i)=>c.numero=i+1);
   pintarCostales();
   actualizarResumen();
   guardar();
@@ -1268,7 +1409,9 @@ function pintarCostales(){
   if(estado.costales.length===0){ empty.style.display='block'; return; }
   empty.style.display='none';
 
-  estado.costales.forEach((c, idx)=>{
+  // Se muestran del más reciente al más antiguo (el último costal agregado queda arriba),
+  // para no tener que bajar hasta el final de la lista cada vez.
+  estado.costales.slice().map((c, i)=>({c, idx:i})).reverse().forEach(({c, idx})=>{
     const card = document.createElement('div');
     card.className='tambo-card';
     const inputId = `fotoCostal_${idx}`;
@@ -1412,6 +1555,36 @@ function actualizarResumen(){
   const totalCostales = estado.costales.length;
   const kgTotal = estado.costales.reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
   const inventario = parseFloat(estado.inventarioParcela) || 0;
+
+  // En modo de 2 supervisores, el avance diario se calcula solo (hectáreas × densidad de plantación)
+  // y se guarda en estado.avanceDiarioManual para que el resto de los cálculos (acumulado, restante,
+  // resumen del día, PDF, etc.) sigan funcionando exactamente igual sin cambios adicionales.
+  let jornaleros = parseFloat(estado.jornaleros) || 0;
+  if(estado.dosSupervisores){
+    const densidad = parseFloat(estado.densidadPlantacion) || 0;
+    const hect1 = parseFloat(estado.hectareasSup1) || 0;
+    const hect2 = parseFloat(estado.hectareasSup2) || 0;
+    const jorn1 = parseFloat(estado.jornalesSup1) || 0;
+    const jorn2 = parseFloat(estado.jornalesSup2) || 0;
+    const avance1 = hect1 * densidad;
+    const avance2 = hect2 * densidad;
+    estado.avanceDiarioManual = avance1 + avance2;
+    jornaleros = jorn1 + jorn2;
+    document.getElementById('totalHectareasSups').textContent = (hect1 + hect2).toLocaleString('es-MX', {maximumFractionDigits:2});
+
+    const prom1 = jorn1>0 ? avance1/jorn1 : 0;
+    const prom2 = jorn2>0 ? avance2/jorn2 : 0;
+    const sem1 = prom1>0 ? semaforoRendimiento(prom1) : '';
+    const sem2 = prom2>0 ? semaforoRendimiento(prom2) : '';
+    const emoji1 = sem1==='sem-verde'?'🟢':(sem1==='sem-rojo'?'🔴':'');
+    const emoji2 = sem2==='sem-verde'?'🟢':(sem2==='sem-rojo'?'🔴':'');
+    document.getElementById('statsSup1').innerHTML =
+      `<div class="stat-fila"><span>Avance (ha × densidad)</span><b>${Math.round(avance1).toLocaleString('es-MX')} plantas</b></div>` +
+      `<div class="stat-fila" style="border-bottom:none;"><span>Plantas por jornal</span><b>${prom1>0 ? emoji1+' '+Math.round(prom1).toLocaleString('es-MX') : '—'}</b></div>`;
+    document.getElementById('statsSup2').innerHTML =
+      `<div class="stat-fila"><span>Avance (ha × densidad)</span><b>${Math.round(avance2).toLocaleString('es-MX')} plantas</b></div>` +
+      `<div class="stat-fila" style="border-bottom:none;"><span>Plantas por jornal</span><b>${prom2>0 ? emoji2+' '+Math.round(prom2).toLocaleString('es-MX') : '—'}</b></div>`;
+  }
   const avanceDiario = parseFloat(estado.avanceDiarioManual) || 0;
 
   document.getElementById('sumCostales').textContent = totalCostales;
@@ -1426,7 +1599,6 @@ function actualizarResumen(){
   document.getElementById('sumMuestras').textContent = estado.muestrasTestigo.length;
 
   // avance diario y jornales (sección 5): rendimiento contra el estándar de 1,500 plantas/jornal
-  const jornaleros = parseFloat(estado.jornaleros) || 0;
   const promedioJornal = (jornaleros>0 && avanceDiario>0) ? (avanceDiario/jornaleros) : 0;
   document.getElementById('avanceRendimiento').textContent = promedioJornal>0
     ? Math.round(promedioJornal).toLocaleString('es-MX')
@@ -1918,6 +2090,18 @@ function renderDetalleLectura(r){
     <tr><td><b>Ubicación</b></td><td>${r.ubicacion ? (r.ubicacion.lat+', '+r.ubicacion.lon) : '—'}</td></tr>
   </table></div>`;
 
+  if(r.dosSupervisores){
+    const dens = parseFloat(r.densidadPlantacion)||0;
+    const h1 = parseFloat(r.hectareasSup1)||0, h2 = parseFloat(r.hectareasSup2)||0;
+    const j1 = parseFloat(r.jornalesSup1)||0, j2 = parseFloat(r.jornalesSup2)||0;
+    html += `<div class="detalle-section"><h3>Dos supervisores en esta parcela</h3><table>
+      <tr><td>Densidad de plantación</td><td class="num">${dens ? dens.toLocaleString('es-MX')+' pl/ha' : '—'}</td></tr>
+      <tr><td>Supervisor 1 (${r.supervisor||'—'})</td><td class="num">${h1} ha · ${j1} jornales · ${Math.round(h1*dens).toLocaleString('es-MX')} plantas</td></tr>
+      <tr><td>Supervisor 2 (${r.supervisor2||'—'})</td><td class="num">${h2} ha · ${j2} jornales · ${Math.round(h2*dens).toLocaleString('es-MX')} plantas</td></tr>
+      <tr><td>Total hectáreas</td><td class="num">${(h1+h2).toLocaleString('es-MX')} ha</td></tr>
+    </table></div>`;
+  }
+
   html += `<div class="detalle-section"><h3>Costales aplicados (${(r.costales||[]).length}) · ${kgTotal.toLocaleString('es-MX')} kg</h3>`;
   (r.costales||[]).forEach(c=>{
     html += `<p style="font-size:13px;margin:6px 0 2px;"><b>Costal #${c.numero}</b> · ${c.hora||''} · Aplicado por: ${c.aplicadoPor||'—'} · ${c.peso} kg</p>`;
@@ -2056,6 +2240,20 @@ function generarPdfRegistro(r){
       <tr><td>Ubicación GPS</td><td>${r.ubicacion?(r.ubicacion.lat+', '+r.ubicacion.lon+' (±'+r.ubicacion.precision+'m)'):'—'}</td></tr>
     </table>
 
+    ${(()=>{
+      if(!r.dosSupervisores) return '';
+      const dens = parseFloat(r.densidadPlantacion)||0;
+      const h1 = parseFloat(r.hectareasSup1)||0, h2 = parseFloat(r.hectareasSup2)||0;
+      const j1 = parseFloat(r.jornalesSup1)||0, j2 = parseFloat(r.jornalesSup2)||0;
+      return `<h2>Dos supervisores en esta parcela</h2>
+      <table>
+        <tr><th>Supervisor</th><th>Hectáreas</th><th>Jornales</th><th>Plantas (ha × densidad)</th></tr>
+        <tr><td>${r.supervisor||'—'} (Sup. 1)</td><td>${h1}</td><td>${j1}</td><td>${Math.round(h1*dens).toLocaleString('es-MX')}</td></tr>
+        <tr><td>${r.supervisor2||'—'} (Sup. 2)</td><td>${h2}</td><td>${j2}</td><td>${Math.round(h2*dens).toLocaleString('es-MX')}</td></tr>
+      </table>
+      <p>Densidad de plantación: ${dens.toLocaleString('es-MX')} plantas/ha · Total hectáreas: ${(h1+h2).toLocaleString('es-MX')} ha</p>`;
+    })()}
+
     <h2>Resumen de la jornada</h2>
     <div class="stats">
       <div class="stat"><b>${(r.costales||[]).length}</b>Costales aplicados</div>
@@ -2110,7 +2308,8 @@ function onFotoGeneral(inputEl){
   const file = inputEl.files && inputEl.files[0];
   if(!file) return;
   compressImage(file, dataUrl=>{
-    estado.evidenciasGenerales.push({dataUrl, hora: fmtFechaHora(new Date())});
+    const supervisorTag = estado.dosSupervisores ? estado.evidenciaSupervisorActivo : null;
+    estado.evidenciasGenerales.push({dataUrl, hora: fmtFechaHora(new Date()), supervisor: supervisorTag});
     pintarGaleriaGeneral();
     actualizarResumen();
     guardar();
@@ -2129,7 +2328,7 @@ function pintarGaleriaGeneral(){
   cont.innerHTML = estado.evidenciasGenerales.map((ev,i)=>`
     <div class="galeria-item">
       <img src="${ev.dataUrl}" alt="Evidencia general ${i+1}">
-      <div class="cap"><span>Evidencia #${i+1} · ${ev.hora.split(' ')[1]||''}</span>
+      <div class="cap"><span>Evidencia #${i+1}${ev.supervisor ? ' · Sup. '+ev.supervisor : ''} · ${ev.hora.split(' ')[1]||''}</span>
         <span>
           <button onclick="descargarFoto('${ev.dataUrl}', 'evidencia_general_${i+1}.jpg')" type="button" title="Descargar" style="color:var(--agave-dark);">⬇️</button>
           <button onclick="quitarFotoGeneral(${i})" type="button" title="Quitar">✕</button>
@@ -2161,7 +2360,7 @@ function onKmlInput(inputEl){
           if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
         }
       }catch(err){ console.error('No se pudo leer el KML', err); }
-      const kmlObj = {archivo: nombre, placemark, vertices, areaHa, puntos, satelite: null, bboxSatelital: null};
+      const kmlObj = {archivo: nombre, placemark, vertices, areaHa, puntos, satelite: null, bboxSatelital: null, supervisor: estado.dosSupervisores ? estado.evidenciaSupervisorActivo : null};
       estado.kmls.push(kmlObj);
       pendientes--;
       if(pendientes===0){
@@ -2198,7 +2397,7 @@ function pintarKmlInfo(){
     const visual = k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos);
     return `
     <div class="kml-card">
-      <b>${k.placemark || k.archivo}</b>
+      <b>${k.placemark || k.archivo}</b>${k.supervisor ? ' <span class="badge" style="background:var(--ochre);">Sup. '+k.supervisor+'</span>' : ''}
       Archivo: ${k.archivo}${k.vertices ? ' · '+k.vertices+' vértices' : ''}${k.areaHa ? ' · ≈ '+k.areaHa.toFixed(2)+' ha' : ''}
       ${visual}
       ${!k.satelite ? '<p class="hint" style="margin:4px 0 0;">Conéctate a internet una vez para cargar la imagen satelital de fondo; mientras tanto se muestra un dibujo esquemático.</p>' : ''}
@@ -2221,14 +2420,25 @@ function calcularBBoxPadded(puntos, paddingFrac){
 function obtenerImagenSatelital(bbox, w, h){
   if(!navigator.onLine) return Promise.reject(new Error('sin conexión'));
   const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox.minLon},${bbox.minLat},${bbox.maxLon},${bbox.maxLat}&bboxSR=4326&imageSR=4326&size=${w},${h}&format=png24&transparent=false&f=image`;
-  return fetch(url).then(resp=>{
+  // reduce el tamaño de imagen pedido al servicio para que la foto satelital ya venga liviana
+  const wReal = Math.round(w*0.7), hReal = Math.round(h*0.7);
+  const urlReducida = url.replace(`size=${w},${h}`, `size=${wReal},${hReal}`);
+  return fetch(urlReducida).then(resp=>{
     if(!resp.ok) throw new Error('respuesta no válida del servicio satelital');
     return resp.blob();
   }).then(blob=> new Promise((resolve,reject)=>{
-    const reader = new FileReader();
-    reader.onload = ()=>resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    const img = new Image();
+    const urlTemp = URL.createObjectURL(blob);
+    img.onload = ()=>{
+      // convierte la imagen (PNG, pesada) a JPEG comprimido antes de guardarla, para ahorrar espacio
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width; canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(urlTemp);
+      resolve(canvas.toDataURL('image/jpeg', 0.55));
+    };
+    img.onerror = reject;
+    img.src = urlTemp;
   }));
 }
 // Dibuja el contorno del polígono alineado sobre el bbox exacto usado para pedir la imagen satelital
@@ -2396,6 +2606,15 @@ function mostrarDiagnostico(){
   }catch(e){ guardadoOk = false; }
   partes.push('Guardado local (localStorage): ' + (guardadoOk ? 'Funciona ✅' : 'BLOQUEADO ⚠️'));
 
+  let pesoTotalKB = 0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      pesoTotalKB += ((localStorage.getItem(k)||'').length * 2) / 1024; // aprox. 2 bytes por caracter
+    }
+  }catch(e){}
+  partes.push('Espacio usado ahora (aprox.): ' + Math.round(pesoTotalKB).toLocaleString('es-MX') + ' KB de un límite típico de 5,000-10,000 KB');
+
   if('serviceWorker' in navigator){
     navigator.serviceWorker.getRegistration().then(reg=>{
       partes.push('Service Worker registrado: ' + (reg ? 'Sí ✅' : 'No ⚠️ (necesita abrir una vez con internet)'));
@@ -2414,6 +2633,37 @@ function mostrarDiagnostico(){
   }
 }
 
+
+// Exporta un respaldo de TODO el historial guardado y luego lo borra, para liberar espacio rápido
+function liberarEspacio(){
+  const historial = cargarHistorial();
+  if(historial.length===0){
+    alert('El historial ya está vacío; no hay nada que liberar ahí. Si el error persiste, borra también fotos de la jornada activa que no necesites, o exporta y comienza una jornada nueva.');
+    return;
+  }
+  if(!confirm(`Vas a exportar un respaldo de los ${historial.length} registro(s) del historial y luego BORRARLOS de este dispositivo para liberar espacio.\n\nEl archivo de respaldo se descargará a tu teléfono antes de borrar nada. ¿Continuar?`)) return;
+
+  const data = JSON.stringify(historial, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = fmtFechaHora(new Date()).replace(/[\/: ]/g,'-');
+  a.href = url;
+  a.download = `respaldo_historial_completo_${ts}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  setTimeout(()=>{
+    if(confirm('¿Ya se descargó el respaldo? Toca Aceptar para borrar el historial de este dispositivo y liberar espacio (o Cancelar para no borrar nada todavía).')){
+      localStorage.removeItem(KEY_HISTORIAL);
+      alert('Historial borrado de este dispositivo. Tu respaldo sigue disponible en el archivo descargado.');
+      if(document.getElementById('historialOverlay')) pintarHistorial();
+      if(typeof pintarResumenDiaPrincipal === 'function') pintarResumenDiaPrincipal();
+    }
+  }, 800);
+}
 
 function instalarApp(){
   if(estaEnVistaPreviaEmbebida()){
@@ -2458,6 +2708,17 @@ if('serviceWorker' in navigator && !estaEnVistaPreviaEmbebida()){
 if(navigator.storage && navigator.storage.persist){
   navigator.storage.persist().catch(()=>{});
 }
+
+// Advierte antes de recargar/cerrar la pestaña si hay una parcela o algún registro capturado,
+// para evitar perder de vista que hay una jornada en curso (los datos ya están guardados,
+// pero esto ayuda a que no se recargue la página sin querer a media captura).
+window.addEventListener('beforeunload', function(e){
+  const hayDatos = (estado.parcela && estado.parcela.trim()!=='');
+  if(hayDatos){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 iniciar();
 </script>
