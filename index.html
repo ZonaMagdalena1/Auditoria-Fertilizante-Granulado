@@ -972,7 +972,13 @@ function iniciar(){
   }else{
     document.getElementById('avisoEdicion').style.display = 'none';
   }
-  if(!estado.fechaHora){
+  // La fecha/hora de inicio se actualiza sola cuando abres la app en un día distinto y todavía
+  // no hay nada capturado (borrador vacío); si ya empezaste a capturar algo, se respeta la fecha
+  // en la que realmente comenzaste esa jornada, aunque sigas trabajando en ella al día siguiente.
+  const hoyStr = fmtFechaHora(new Date()).split(' ')[0];
+  const fechaActualStr = estado.fechaHora ? estado.fechaHora.split(' ')[0] : '';
+  const borradorVacio = (!estado.parcela || estado.parcela.trim()==='') && (estado.costales||[]).length===0;
+  if(!estado.fechaHora || (!estado._editandoHistorialId && borradorVacio && fechaActualStr !== hoyStr)){
     estado.fechaHora = fmtFechaHora(new Date());
   }
   if(!estado.evidenciasGenerales) estado.evidenciasGenerales = [];
