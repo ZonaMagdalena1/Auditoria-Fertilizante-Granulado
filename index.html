@@ -493,6 +493,16 @@
     <button class="btn btn-ghost btn-sm" onclick="cancelarEdicionHistorial()" type="button">Cancelar edición</button>
   </div>
 
+  <div class="card" id="avisoEspacioLleno" style="display:none;background:#FAE4E0;border-color:var(--danger);">
+    <h2 style="color:var(--danger);"><span class="n" style="background:var(--danger);">!</span>Sin espacio para guardar más</h2>
+    <p class="hint" style="margin-top:0;font-size:13px;color:#5b2018;">
+      El navegador ya no tiene espacio para seguir guardando en este dispositivo (esto es un límite del navegador, no de tu teléfono). <b>Lo que ya escribiste sigue visible en pantalla</b>, pero no se está guardando — si cierras o recargas la app ahora, sí se perdería.
+    </p>
+    <p class="hint" style="font-size:13px;color:#5b2018;font-weight:700;">Haz esto ahora mismo, antes de seguir capturando:</p>
+    <button class="btn btn-primary btn-block" onclick="exportarJSON()" type="button">⬇️ Exportar respaldo de esta jornada YA</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px;" onclick="liberarEspacio()" type="button">🧹 Liberar espacio (borra historial ya respaldado)</button>
+  </div>
+
   <!-- 1. DATOS GENERALES -->
   <div class="card">
     <h2><span class="n">1</span>Datos de la jornada</h2>
@@ -609,9 +619,30 @@
     <textarea id="observaciones" placeholder="Incidencias, clima, equipo, etc."></textarea>
   </div>
 
-  <!-- 5. AVANCE DIARIO Y JORNALES -->
+  <!-- 5. OTRAS PARCELAS TRABAJADAS HOY -->
   <div class="card">
-    <h2><span class="n">5</span>Avance diario y jornales</h2>
+    <h2><span class="n">5</span>Otras parcelas trabajadas hoy</h2>
+    <p class="hint" style="margin-top:-6px;">Si el mismo día se trabajan varias parcelas, agrégalas aquí — cada una lleva su propio consumo de costales, evidencias y polígono, sin salir de este formulario. Al guardar, cada parcela queda como su propio registro en el historial (para que el avance acumulado de cada una funcione igual que siempre).</p>
+
+    <button class="btn btn-primary btn-block" onclick="agregarParcelaAdicional()" type="button">+ Agregar otra parcela a esta jornada</button>
+
+    <div id="parcelasAdicionalesLista" style="margin-top:12px;"></div>
+
+    <div class="summary-grid" style="margin-top:14px;">
+      <div class="stat progress">
+        <div class="v" id="sumPlantasTotalDia">0</div>
+        <div class="l">Total de plantas trabajadas hoy (todas las parcelas)</div>
+      </div>
+      <div class="stat water">
+        <div class="v" id="sumKgTotalDia">0 kg</div>
+        <div class="l">Fertilizante consumido (todas las parcelas)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. AVANCE DIARIO Y JORNALES -->
+  <div class="card">
+    <h2><span class="n">6</span>Avance diario y jornales</h2>
 
     <label class="first" style="display:flex;align-items:center;gap:8px;font-weight:600;">
       <input type="checkbox" id="dosSupervisoresCheck" onchange="onDosSupervisoresChange(this.checked)" style="width:auto;">
@@ -686,16 +717,16 @@
     </div>
   </div>
 
-  <!-- 6. RESUMEN GENERAL DEL DÍA (VARIAS PARCELAS) -->
+  <!-- 7. RESUMEN GENERAL DEL DÍA (VARIAS PARCELAS) -->
   <div class="card">
-    <h2><span class="n">6</span>Resumen general del día</h2>
+    <h2><span class="n">7</span>Resumen general del día</h2>
     <p class="hint" style="margin-top:0;">Se calcula solo, juntando todas las parcelas guardadas con la misma fecha de hoy (incluida esta jornada activa).</p>
     <div id="resumenDiaPrincipalContenido"></div>
   </div>
 
-  <!-- 7. FIRMA DE AUDITOR -->
+  <!-- 8. FIRMA DE AUDITOR -->
   <div class="card">
-    <h2><span class="n">7</span>Validación del auditor</h2>
+    <h2><span class="n">8</span>Validación del auditor</h2>
     <label class="first">Nombre del auditor</label>
     <input type="text" id="auditorNombre" value="Jorge López Carranza">
 
@@ -713,6 +744,7 @@
   <div class="save-flag no-print" id="saveFlag">
     <span class="dot"></span> Guardado automáticamente en este dispositivo
   </div>
+  <p class="hint no-print" id="espacioUsadoTexto" style="margin-top:4px;"></p>
   <button class="btn btn-ghost btn-sm no-print" style="margin-top:8px;" onclick="exportarJSON()" type="button">⬇️ Exportar respaldo JSON de esta jornada</button>
   <label class="btn btn-ghost btn-sm no-print" style="margin-top:6px;display:inline-flex;">
     ⬆️ Restaurar desde un respaldo JSON
@@ -736,6 +768,17 @@
       <button class="btn btn-ghost btn-sm" onclick="cerrarHistorial()" type="button">Cerrar ✕</button>
     </div>
     <p class="hint" style="margin-top:0;">Cada vez que tocas "Nueva jornada" se guarda automáticamente una copia de la jornada anterior aquí, con sus fotografías.</p>
+
+    <div class="resumen-dia-box" style="border-color:var(--water);background:#E4F0F2;">
+      <label class="first" style="margin-top:0;">☁️ Sincronización en la nube (Google Sheets)</label>
+      <p class="hint" style="margin-top:0;">Pega aquí la dirección de tu Web App de Google Apps Script para respaldar el historial y verlo desde cualquier dispositivo. Las fotografías se quedan solo en el dispositivo donde se tomaron; lo que se sincroniza son los datos capturados.</p>
+      <input type="text" id="syncUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+      <div class="row2" style="margin-top:8px;">
+        <button class="btn btn-ochre" onclick="sincronizarSubir()" type="button">⬆️ Subir a la nube</button>
+        <button class="btn btn-ghost" onclick="sincronizarBajar()" type="button">⬇️ Traer de la nube</button>
+      </div>
+      <p class="hint" id="syncEstado" style="margin-top:6px;margin-bottom:0;"></p>
+    </div>
 
     <div class="resumen-dia-box">
       <label class="first" style="margin-top:0;">📊 Resumen general del día (varias parcelas)</label>
@@ -930,6 +973,8 @@ let estado = {
   kmls: [],    // [{archivo, placemark, vertices, areaHa, puntos}]
   auditor: {nombre:'Jorge López Carranza', firma:null, fecha:''},
   observaciones: '',
+  parcelasAdicionales: [], // [{id, parcela, parcelaIdx, hectareas, anioPlantacion, inventarioParcela,
+                            //   costales, evidenciasGenerales, kmls, avanceDiarioManual, jornaleros, _historialLinkId}]
   _editandoHistorialId: null
 };
 
@@ -944,13 +989,36 @@ function guardar(){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(estado));
     const f = document.getElementById('saveFlag');
     f.style.opacity = 1;
+    const avisoEl = document.getElementById('avisoEspacioLleno');
+    if(avisoEl) avisoEl.style.display = 'none';
   }catch(e){
     console.error('No se pudo guardar localmente', e);
+    const avisoEl = document.getElementById('avisoEspacioLleno');
+    if(avisoEl) avisoEl.style.display = 'block';
     if(!_avisoEspacioMostrado){
       _avisoEspacioMostrado = true;
-      alert('⚠️ El navegador no tiene más espacio para guardar (esto es un límite del navegador, no del almacenamiento real de tu teléfono). Los últimos cambios podrían no haberse guardado.\n\nSolución: toca "🔧 Diagnóstico sin conexión" y luego "🧹 Liberar espacio" para exportar un respaldo y borrar historial antiguo.');
+      alert('⚠️ El navegador se quedó sin espacio para seguir guardando. Lo que ves en pantalla sigue ahí, pero NO se está guardando.\n\nArriba de la página apareció un aviso rojo con los pasos para resolverlo — hazlo antes de seguir capturando, para no perder nada.');
+      window.scrollTo({top:0, behavior:'smooth'});
     }
   }
+  actualizarIndicadorEspacio();
+}
+function actualizarIndicadorEspacio(){
+  const el = document.getElementById('espacioUsadoTexto');
+  if(!el) return;
+  let totalKB = 0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      totalKB += ((localStorage.getItem(k)||'').length * 2) / 1024;
+    }
+  }catch(e){ return; }
+  const limiteAprox = 5000;
+  const pct = Math.min(100, Math.round((totalKB/limiteAprox)*100));
+  let color = 'var(--agave)';
+  if(pct>=90) color = 'var(--danger)';
+  else if(pct>=70) color = 'var(--ochre-dark)';
+  el.innerHTML = `Espacio local usado: <b style="color:${color};">${pct}%</b> (${Math.round(totalKB).toLocaleString('es-MX')} KB)${pct>=70 ? ' — considera exportar y usar "🧹 Liberar espacio" pronto.' : ''}`;
 }
 function cargar(){
   try{
@@ -989,6 +1057,18 @@ function iniciar(){
     estado.kmls = estado.kml ? [estado.kml] : []; // compatibilidad con registros guardados antes de este cambio
   }
   if(!estado.auditor) estado.auditor = {nombre:'Jorge López Carranza', firma:null, fecha:''};
+  if(!estado.parcelasAdicionales) estado.parcelasAdicionales = [];
+  estado.parcelasAdicionales.forEach(b=>{
+    if(!b.costales) b.costales = [];
+    if(!b.evidenciasGenerales) b.evidenciasGenerales = [];
+    if(!b.kmls) b.kmls = [];
+    if(b.pesoCostalDefault === undefined || b.pesoCostalDefault === null || b.pesoCostalDefault === '') b.pesoCostalDefault = 50;
+    b.costales.forEach(c=>{
+      if(c.peso === undefined || c.peso === null || c.peso === '') c.peso = b.pesoCostalDefault;
+      if(c.aplicadoPor === undefined) c.aplicadoPor = '';
+      if(c.evidenciaFoto === undefined) c.evidenciaFoto = null;
+    });
+  });
   estado.costales.forEach(c=>{
     if(c.peso === undefined || c.peso === null || c.peso === '') c.peso = estado.pesoCostalDefault;
     if(c.aplicadoPor === undefined) c.aplicadoPor = '';
@@ -1045,8 +1125,10 @@ function iniciar(){
   pintarMuestrasTestigo();
   pintarGaleriaGeneral();
   pintarKmlInfo();
+  pintarParcelasAdicionales();
   initFirma();
   actualizarResumen();
+  actualizarIndicadorEspacio();
 
   // listeners
   document.getElementById('tipoFertilizante').addEventListener('input', e=>{estado.tipoFertilizante=e.target.value; guardar();});
@@ -1614,6 +1696,18 @@ function actualizarResumen(){
   // avance acumulado de la parcela (todas las jornadas guardadas + hoy) y restante contra el inventario
   actualizarAcumuladoParcela();
 
+  // total combinado del día: parcela principal + todas las parcelas adicionales
+  let plantasTotalDia = avanceDiario;
+  let kgTotalDia = kgTotal;
+  (estado.parcelasAdicionales||[]).forEach(b=>{
+    plantasTotalDia += parseFloat(b.avanceDiarioManual) || 0;
+    kgTotalDia += b.costales.reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+  });
+  const elPlantasDia = document.getElementById('sumPlantasTotalDia');
+  const elKgDia = document.getElementById('sumKgTotalDia');
+  if(elPlantasDia) elPlantasDia.textContent = Math.round(plantasTotalDia).toLocaleString('es-MX');
+  if(elKgDia) elKgDia.textContent = kgTotalDia.toLocaleString('es-MX') + ' kg';
+
   if(typeof pintarResumenDiaPrincipal === 'function') pintarResumenDiaPrincipal();
 }
 
@@ -1759,8 +1853,8 @@ function importarJSON(inputEl){
 
 /* ---------------- Nueva jornada ---------------- */
 function nuevaJornada(){
-  if(!confirm('¿Cerrar esta jornada y comenzar una nueva captura? Se guardará una copia en el historial y podrás consultarla y generar su PDF cuando quieras.')) return;
-  archivarJornadaActual();
+  if(!confirm('¿Cerrar esta jornada y comenzar una nueva captura? Se guardará una copia de todas las parcelas de hoy en el historial y podrás consultarlas y generar su PDF cuando quieras.')) return;
+  archivarTodasLasParcelasDeLaJornada();
   localStorage.removeItem(STORAGE_KEY);
   estado = {
     fechaHora:'', jefeArea:'', supervisor:'', tipoFertilizante:'', parcela:'',
@@ -1768,7 +1862,7 @@ function nuevaJornada(){
     avanceDiarioManual:'', jornaleros:'', pesoCostalDefault: estado.pesoCostalDefault||50,
     costales:[], muestrasTestigo:[], evidenciasGenerales:[], kmls:[],
     auditor:{nombre:'Jorge López Carranza', firma:null, fecha:''},
-    observaciones:'', _editandoHistorialId:null
+    observaciones:'', parcelasAdicionales:[], _editandoHistorialId:null
   };
   iniciar();
 }
@@ -1827,19 +1921,114 @@ function archivarJornadaActual(){
   return ok;
 }
 
+// Convierte un bloque de "parcela adicional" en un registro completo del historial, reutilizando
+// los datos compartidos de la jornada (fecha, jefe de área, supervisor, auditor, etc.), y lo guarda
+// con la misma lógica de "actualizar si ya existe" que la parcela principal.
+function archivarParcelaAdicional(bloque){
+  const tieneContenido = (bloque.parcela && bloque.parcela.trim()!=='') || bloque.costales.length>0;
+  if(!tieneContenido) return false;
+
+  const registro = {
+    fechaHora: estado.fechaHora,
+    jefeArea: estado.jefeArea, supervisor: estado.supervisor,
+    tipoFertilizante: estado.tipoFertilizante,
+    parcela: bloque.parcela, parcelaIdx: bloque.parcelaIdx,
+    hectareas: bloque.hectareas, anioPlantacion: bloque.anioPlantacion,
+    inventarioParcela: bloque.inventarioParcela,
+    ubicacion: estado.ubicacion,
+    avanceDiarioManual: bloque.avanceDiarioManual, jornaleros: bloque.jornaleros,
+    dosSupervisores: false,
+    pesoCostalDefault: bloque.pesoCostalDefault,
+    costales: bloque.costales, muestrasTestigo: [],
+    evidenciasGenerales: bloque.evidenciasGenerales, kmls: bloque.kmls,
+    auditor: estado.auditor,
+    observaciones: estado.observaciones ? (estado.observaciones + ' [parcela adicional de la misma jornada]') : '[parcela adicional de la misma jornada]'
+  };
+
+  const historial = cargarHistorial();
+  const fechaActual = extraerFecha(registro.fechaHora);
+  const copia = JSON.parse(JSON.stringify(registro));
+
+  let idxExistente = bloque._historialLinkId ? historial.findIndex(r=>r._id === bloque._historialLinkId) : -1;
+  if(idxExistente === -1 && registro.parcela){
+    idxExistente = historial.findIndex(r=> extraerFecha(r.fechaHora)===fechaActual && r.parcela===registro.parcela);
+  }
+
+  if(idxExistente !== -1){
+    copia._id = historial[idxExistente]._id;
+    copia._archivadoEn = fmtFechaHora(new Date());
+    historial[idxExistente] = copia;
+    bloque._historialLinkId = copia._id;
+    return guardarHistorial(historial);
+  }
+
+  copia._id = 'jornada_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+  copia._archivadoEn = fmtFechaHora(new Date());
+  historial.push(copia);
+  bloque._historialLinkId = copia._id;
+  return guardarHistorial(historial);
+}
+// Guarda la parcela principal y todas las parcelas adicionales de la jornada, cada una como su
+// propio registro del historial (para que el acumulado de cada parcela funcione igual que siempre).
+function archivarTodasLasParcelasDeLaJornada(){
+  const okPrincipal = archivarJornadaActual();
+  let okAdicionales = true;
+  (estado.parcelasAdicionales||[]).forEach(bloque=>{
+    const ok = archivarParcelaAdicional(bloque);
+    if(!ok) okAdicionales = false;
+  });
+  guardar(); // guarda los _historialLinkId asignados a cada bloque
+  return okPrincipal && okAdicionales;
+}
+
 // Botón "Guardar": archiva/actualiza el registro de esta parcela y fecha en el historial,
 // sin borrar ni cerrar la jornada, para poder seguir capturando durante el día.
 function guardarFormularioDelDia(){
-  const tieneContenido = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
-  if(!tieneContenido){
-    alert('Todavía no hay nada que guardar: captura al menos la parcela o un costal.');
+  const tieneContenidoPrincipal = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
+  const tieneAdicionales = (estado.parcelasAdicionales||[]).some(b=> (b.parcela && b.parcela.trim()!=='') || b.costales.length>0);
+  if(!tieneContenidoPrincipal && !tieneAdicionales){
+    alert('Todavía no hay nada que guardar: captura al menos una parcela o un costal.');
     return;
   }
-  const ok = archivarJornadaActual();
+  const ok = archivarTodasLasParcelasDeLaJornada();
   if(ok){
-    alert('✅ Guardado en el historial (' + fmtFechaHora(new Date()) + ').\n\nPuedes seguir capturando tambos en esta misma parcela; cada vez que toques "Guardar" se actualiza este mismo registro (no se duplica). Si empiezas otra parcela con "Nueva jornada", se guardará como un registro aparte.');
+    const totalParcelas = 1 + (estado.parcelasAdicionales||[]).length;
+    alert(`✅ Guardado en el historial (${fmtFechaHora(new Date())}) — ${totalParcelas} parcela(s) de esta jornada.\n\nPuedes seguir capturando; cada vez que toques "Guardar" se actualiza cada registro (no se duplica).`);
     pintarResumenDiaPrincipal();
+    sincronizarAutomaticoSilencioso();
+    sincronizarAdicionalesSilencioso();
   }
+}
+// Sube en silencio a la nube (si hay URL configurada) cada parcela adicional guardada
+function sincronizarAdicionalesSilencioso(){
+  const url = obtenerUrlSync();
+  if(!url || !navigator.onLine) return;
+  (estado.parcelasAdicionales||[]).forEach(bloque=>{
+    if(!bloque.parcela) return;
+    try{
+      const registro = {
+        _id: bloque._historialLinkId, fechaHora: estado.fechaHora,
+        jefeArea: estado.jefeArea, supervisor: estado.supervisor, tipoFertilizante: estado.tipoFertilizante,
+        parcela: bloque.parcela, inventarioParcela: bloque.inventarioParcela,
+        avanceDiarioManual: bloque.avanceDiarioManual, jornaleros: bloque.jornaleros,
+        costales: bloque.costales, observaciones: '[parcela adicional]'
+      };
+      const payload = despojarFotos(registro);
+      payload.hoja = NOMBRE_HOJA_SYNC;
+      fetch(url, {method:'POST', body: JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}}).catch(()=>{});
+    }catch(e){}
+  });
+}
+// Si ya se configuró una URL de sincronización, sube este registro solo, sin molestar con mensajes
+// (no bloquea ni avisa si falla; es un respaldo de cortesía además del guardado local).
+function sincronizarAutomaticoSilencioso(){
+  const url = obtenerUrlSync();
+  if(!url || !navigator.onLine) return;
+  try{
+    const payload = despojarFotos(estado);
+    payload.hoja = NOMBRE_HOJA_SYNC;
+    fetch(url, {method:'POST', body: JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}}).catch(()=>{});
+  }catch(e){}
 }
 
 function abrirHistorial(){
@@ -1848,6 +2037,8 @@ function abrirHistorial(){
   const parcelas = Array.from(new Set(historial.map(r=>r.parcela).filter(Boolean))).sort();
   filtro.innerHTML = '<option value="">Todas las parcelas</option>' + parcelas.map(p=>`<option value="${p}">${p}</option>`).join('');
   pintarHistorial();
+  document.getElementById('syncUrlInput').value = obtenerUrlSync();
+  document.getElementById('syncEstado').textContent = '';
 
   // fechas disponibles para el resumen general del día
   const fechas = new Set(historial.map(r=>extraerFecha(r.fechaHora)).filter(Boolean));
@@ -1972,6 +2163,89 @@ function borrarResumenDelDia(){
   pintarResumenDiaPrincipal();
   alert('Registros del ' + fecha + ' eliminados del historial.');
 }
+
+/* ---------------- Sincronización en la nube (Google Sheets / Apps Script) ---------------- */
+const NOMBRE_HOJA_SYNC = 'Fertilizante';
+const KEY_SYNC_URL = 'agave_sync_url';
+
+function obtenerUrlSync(){
+  try{ return localStorage.getItem(KEY_SYNC_URL) || ''; }catch(e){ return ''; }
+}
+function guardarUrlSync(v){
+  try{ localStorage.setItem(KEY_SYNC_URL, v); }catch(e){}
+}
+
+// Quita las fotografías (dataURL) de una copia del registro antes de subirlo a la nube:
+// las fotos son pesadas y se quedan guardadas únicamente en el dispositivo donde se tomaron.
+function despojarFotos(obj){
+  const copia = JSON.parse(JSON.stringify(obj));
+  const limpiar = v => v ? '[foto guardada en el dispositivo]' : v;
+  (copia.costales||[]).forEach(c=>{ c.evidenciaFoto = limpiar(c.evidenciaFoto); });
+  (copia.muestrasTestigo||[]).forEach(m=>{ m.antes = limpiar(m.antes); m.despues = limpiar(m.despues); });
+  (copia.evidenciasGenerales||[]).forEach(ev=>{ ev.dataUrl = limpiar(ev.dataUrl); });
+  (copia.kmls||[]).forEach(k=>{ if(k) k.satelite = limpiar(k.satelite); });
+  if(copia.auditor) copia.auditor.firma = limpiar(copia.auditor.firma);
+  return copia;
+}
+
+function sincronizarSubir(){
+  const url = document.getElementById('syncUrlInput').value.trim();
+  const estadoEl = document.getElementById('syncEstado');
+  if(!url){ alert('Pega primero la dirección (URL) de tu Web App de Google Apps Script.'); return; }
+  guardarUrlSync(url);
+  const historial = cargarHistorial();
+  if(historial.length===0){ alert('No hay registros guardados en el historial para subir todavía.'); return; }
+
+  let i = 0, fallos = 0;
+  function subirSiguiente(){
+    if(i>=historial.length){
+      estadoEl.textContent = fallos===0
+        ? `✅ Se subieron ${historial.length} registro(s) a la nube.`
+        : `⚠️ Se subieron ${historial.length-fallos} de ${historial.length}. ${fallos} fallaron (revisa tu conexión).`;
+      return;
+    }
+    const payload = despojarFotos(historial[i]);
+    payload.hoja = NOMBRE_HOJA_SYNC;
+    estadoEl.textContent = `Subiendo ${i+1} de ${historial.length}...`;
+    fetch(url, {method:'POST', body: JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}})
+      .then(()=>{ i++; subirSiguiente(); })
+      .catch(()=>{ fallos++; i++; subirSiguiente(); });
+  }
+  subirSiguiente();
+}
+
+function sincronizarBajar(){
+  const url = document.getElementById('syncUrlInput').value.trim();
+  const estadoEl = document.getElementById('syncEstado');
+  if(!url){ alert('Pega primero la dirección (URL) de tu Web App de Google Apps Script.'); return; }
+  guardarUrlSync(url);
+  estadoEl.textContent = 'Descargando de la nube...';
+  fetch(url + '?hoja=' + encodeURIComponent(NOMBRE_HOJA_SYNC))
+    .then(r=>r.json())
+    .then(filas=>{
+      if(!Array.isArray(filas)){ estadoEl.textContent = '⚠️ La respuesta de la nube no tuvo el formato esperado.'; return; }
+      const historial = cargarHistorial();
+      let nuevos = 0, yaExistian = 0;
+      filas.forEach(fila=>{
+        let completo = null;
+        try{ completo = JSON.parse(fila.datosCompletosJSON); }catch(e){ return; }
+        if(!completo || !completo._id) return;
+        const existe = historial.some(r=>r._id === completo._id);
+        if(existe){
+          yaExistian++; // ya está en este dispositivo (con sus fotos); no se sobrescribe para no perderlas
+        }else{
+          historial.push(completo);
+          nuevos++;
+        }
+      });
+      guardarHistorial(historial);
+      estadoEl.textContent = `✅ Listo: ${nuevos} registro(s) nuevo(s) agregados (de otros dispositivos). ${yaExistian} ya estaban en este dispositivo y no se tocaron.`;
+      pintarHistorial();
+      pintarResumenDiaPrincipal();
+    })
+    .catch(()=>{ estadoEl.textContent = '⚠️ No se pudo descargar. Revisa tu conexión a internet o la dirección del Web App.'; });
+}
+
 function pintarHistorial(){
   const historial = cargarHistorial().slice().reverse(); // más reciente primero
   const filtroVal = document.getElementById('historialFiltroParcela').value;
@@ -2278,6 +2552,14 @@ function generarPdfRegistro(r){
       ${filas || '<tr><td colspan="4">Sin costales registrados</td></tr>'}
     </table>
 
+    ${(()=>{
+      const adicionales = r.parcelasAdicionales || [];
+      if(!adicionales.length) return '';
+      return '<h2>Otras parcelas de esta misma jornada</h2><table><tr><th>Parcela</th><th>Avance (plantas)</th><th>Jornales</th><th>Costales</th><th>Kg</th></tr>' +
+        adicionales.map(b=>`<tr><td>${b.parcela||'—'}</td><td>${b.avanceDiarioManual||0}</td><td>${b.jornaleros||0}</td><td>${(b.costales||[]).length}</td><td>${(b.costales||[]).reduce((s,c)=>s+(parseFloat(c.peso)||0),0)}</td></tr>`).join('') +
+        '</table><p>Cada una de estas parcelas queda guardada como su propio registro en el historial, con su propio PDF disponible ahí.</p>';
+    })()}
+
     <h2>Evidencias fotográficas</h2>
     <div class="fotos">${fotosHtml || '<p>Sin fotografías registradas.</p>'}</div>
 
@@ -2512,6 +2794,277 @@ function construirSvgPoligono(puntos, w, h){
   </svg>`;
 }
 
+/* ---------------- Otras parcelas trabajadas hoy (misma jornada) ---------------- */
+function agregarParcelaAdicional(){
+  estado.parcelasAdicionales.push({
+    id: 'bloque_' + Date.now() + '_' + Math.floor(Math.random()*10000),
+    parcela: '', parcelaIdx: '', hectareas: '', anioPlantacion: '', inventarioParcela: '',
+    pesoCostalDefault: estado.pesoCostalDefault || 50,
+    costales: [], evidenciasGenerales: [], kmls: [],
+    avanceDiarioManual: '', jornaleros: '',
+    _historialLinkId: null
+  });
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+function quitarParcelaAdicional(idx){
+  if(!confirm('¿Quitar esta parcela de la jornada de hoy? Si ya la habías guardado, el registro que quedó en el historial NO se borra (solo se quita de este formulario).')) return;
+  estado.parcelasAdicionales.splice(idx,1);
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+function bloqueCambio(idx, campo, valor){
+  estado.parcelasAdicionales[idx][campo] = valor;
+  actualizarResumen();
+  guardar();
+}
+function onParcelaBloqueChange(idx, v){
+  const bloque = estado.parcelasAdicionales[idx];
+  const manualInput = document.getElementById('parcelaBloqueManual_'+idx);
+  if(v === 'otra'){
+    if(manualInput) manualInput.style.display = 'block';
+    bloque.parcela = manualInput ? manualInput.value : '';
+    bloque.parcelaIdx = ''; bloque.hectareas = ''; bloque.anioPlantacion = '';
+  }else if(v === ''){
+    if(manualInput) manualInput.style.display = 'none';
+    bloque.parcela = ''; bloque.parcelaIdx = ''; bloque.hectareas = ''; bloque.anioPlantacion = '';
+  }else{
+    if(manualInput) manualInput.style.display = 'none';
+    const item = INVENTARIO[parseInt(v)];
+    bloque.parcelaIdx = v;
+    bloque.parcela = item.rancho + ' · ' + item.contrato;
+    bloque.hectareas = item.has;
+    bloque.anioPlantacion = item.anio;
+    bloque.inventarioParcela = item.inventario;
+  }
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+function parcelaBloqueManualCambio(idx, valor){
+  estado.parcelasAdicionales[idx].parcela = valor;
+  guardar();
+}
+
+// --- Costales dentro de un bloque de parcela adicional ---
+function abrirNuevoCostalBloque(idx){
+  const bloque = estado.parcelasAdicionales[idx];
+  if(!bloque.parcela){ alert('Primero selecciona la parcela de este bloque.'); return; }
+  let maxNum = 0;
+  bloque.costales.forEach(c=>{ if((c.numero||0)>maxNum) maxNum=c.numero; });
+  const historial = cargarHistorial().filter(r=> r.parcela === bloque.parcela && r._id !== bloque._historialLinkId);
+  historial.forEach(r=>{ (r.costales||[]).forEach(c=>{ if((c.numero||0)>maxNum) maxNum=c.numero; }); });
+  const ultimoAplicador = (()=>{ try{ return localStorage.getItem('fert_ultimo_aplicador') || ''; }catch(e){ return ''; } })();
+  bloque.costales.push({
+    numero: maxNum+1,
+    hora: fmtFechaHora(new Date()),
+    peso: bloque.pesoCostalDefault || 50,
+    aplicadoPor: ultimoAplicador,
+    evidenciaFoto: null
+  });
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+function quitarCostalBloque(idxBloque, idxCostal){
+  estado.parcelasAdicionales[idxBloque].costales.splice(idxCostal,1);
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+function costalBloqueCambioPeso(idxBloque, idxCostal, valor){
+  let n = parseFloat(valor); if(isNaN(n)||n<0) n = 0;
+  estado.parcelasAdicionales[idxBloque].costales[idxCostal].peso = n;
+  actualizarResumen();
+  guardar();
+}
+function costalBloqueCambioAplicadoPor(idxBloque, idxCostal, valor){
+  estado.parcelasAdicionales[idxBloque].costales[idxCostal].aplicadoPor = valor;
+  try{ localStorage.setItem('fert_ultimo_aplicador', valor); }catch(e){}
+  guardar();
+}
+function onFotoCostalBloque(idxBloque, idxCostal, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  compressImage(file, dataUrl=>{
+    estado.parcelasAdicionales[idxBloque].costales[idxCostal].evidenciaFoto = dataUrl;
+    pintarParcelasAdicionales();
+    actualizarResumen();
+    guardar();
+  });
+  inputEl.value = '';
+}
+function quitarFotoCostalBloque(idxBloque, idxCostal){
+  estado.parcelasAdicionales[idxBloque].costales[idxCostal].evidenciaFoto = null;
+  pintarParcelasAdicionales();
+  guardar();
+}
+
+// --- Evidencias generales dentro de un bloque ---
+function onFotoGeneralBloque(idx, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  compressImage(file, dataUrl=>{
+    estado.parcelasAdicionales[idx].evidenciasGenerales.push({dataUrl, hora: fmtFechaHora(new Date())});
+    pintarParcelasAdicionales();
+    actualizarResumen();
+    guardar();
+  });
+  inputEl.value = '';
+}
+function quitarFotoGeneralBloque(idxBloque, i){
+  estado.parcelasAdicionales[idxBloque].evidenciasGenerales.splice(i,1);
+  pintarParcelasAdicionales();
+  actualizarResumen();
+  guardar();
+}
+
+// --- KML dentro de un bloque ---
+function onKmlInputBloque(idxBloque, inputEl){
+  const files = inputEl.files;
+  if(!files || files.length===0) return;
+  Array.from(files).forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const texto = e.target.result;
+      let nombre = file.name, placemark = '', vertices = 0, areaHa = null, puntos = [];
+      try{
+        const xml = new DOMParser().parseFromString(texto, 'text/xml');
+        const nombreNode = xml.querySelector('Placemark > name') || xml.querySelector('name');
+        if(nombreNode) placemark = nombreNode.textContent.trim();
+        const coordNode = xml.querySelector('coordinates');
+        if(coordNode){
+          const pares = coordNode.textContent.trim().split(/\s+/).map(p=>p.split(',').map(Number)).filter(p=>p.length>=2 && !isNaN(p[0]) && !isNaN(p[1]));
+          vertices = pares.length;
+          puntos = pares.map(p=>[p[0], p[1]]);
+          if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
+        }
+      }catch(err){ console.error('No se pudo leer el KML', err); }
+      const kmlObj = {archivo: nombre, placemark, vertices, areaHa, puntos, satelite: null, bboxSatelital: null};
+      estado.parcelasAdicionales[idxBloque].kmls.push(kmlObj);
+      pintarParcelasAdicionales();
+      guardar();
+      if(puntos.length>=3){
+        const bbox = calcularBBoxPadded(puntos, 0.18);
+        obtenerImagenSatelital(bbox, 640, 420).then(dataUrl=>{
+          kmlObj.satelite = dataUrl;
+          kmlObj.bboxSatelital = bbox;
+          guardar();
+          pintarParcelasAdicionales();
+        }).catch(()=>{});
+      }
+    };
+    reader.readAsText(file);
+  });
+  inputEl.value = '';
+}
+function quitarKmlBloque(idxBloque, idxKml){
+  estado.parcelasAdicionales[idxBloque].kmls.splice(idxKml,1);
+  pintarParcelasAdicionales();
+  guardar();
+}
+
+// --- Render de todos los bloques de parcelas adicionales ---
+function pintarParcelasAdicionales(){
+  const cont = document.getElementById('parcelasAdicionalesLista');
+  if(!cont) return;
+  if(estado.parcelasAdicionales.length===0){ cont.innerHTML = '<p class="empty">No se han agregado otras parcelas a esta jornada.</p>'; return; }
+
+  cont.innerHTML = estado.parcelasAdicionales.map((bloque, idx)=>{
+    const opcionesParcela = '<option value="">— Selecciona una parcela —</option>' +
+      INVENTARIO.map((p,i)=>`<option value="${i}" ${String(bloque.parcelaIdx)===String(i)?'selected':''}>${p.rancho} · ${p.contrato} (${p.anio})</option>`).join('') +
+      `<option value="otra" ${bloque.parcelaIdx==='' && bloque.parcela ? 'selected':''}>Otra parcela (no listada)</option>`;
+
+    const costalesHtml = bloque.costales.map((c, ic)=>{
+      const inputId = `fotoCostalBloque_${idx}_${ic}`;
+      const fotoHtml = c.evidenciaFoto ? `
+        <div class="foto-thumb-wrap" style="margin-top:6px;">
+          <img src="${c.evidenciaFoto}" alt="Costal ${c.numero}">
+          <div class="foto-thumb-actions">
+            <button class="btn btn-ghost btn-sm" onclick="descargarFoto('${c.evidenciaFoto}','costal${c.numero}.jpg')" type="button">⬇️</button>
+            <button class="btn btn-danger btn-sm" onclick="quitarFotoCostalBloque(${idx},${ic})" type="button">Quitar</button>
+          </div>
+        </div>` : `
+        <label class="foto-capture-btn" for="${inputId}" style="margin-top:6px;">
+          📷 Tomar foto
+          <input type="file" id="${inputId}" accept="image/*" capture="environment" style="display:none;" onchange="onFotoCostalBloque(${idx},${ic},this)">
+        </label>`;
+      return `<div class="tambo-card" style="margin-top:6px;">
+        <div class="head"><span>Costal #${c.numero} · ${c.peso} kg</span><button class="del" onclick="quitarCostalBloque(${idx},${ic})">✕</button></div>
+        <label style="margin:4px 0 2px;">Aplicado por</label>
+        <input type="text" value="${c.aplicadoPor||''}" oninput="costalBloqueCambioAplicadoPor(${idx},${ic},this.value)">
+        <label style="margin:8px 0 2px;">Peso (kg)</label>
+        <input type="number" min="0" step="0.5" value="${c.peso}" onchange="costalBloqueCambioPeso(${idx},${ic},this.value)">
+        ${fotoHtml}
+      </div>`;
+    }).join('');
+
+    const evidenciasHtml = bloque.evidenciasGenerales.map((ev,i)=>`
+      <div class="galeria-item">
+        <img src="${ev.dataUrl}" alt="Evidencia">
+        <div class="cap"><span>Evidencia #${i+1}</span>
+          <span>
+            <button onclick="descargarFoto('${ev.dataUrl}', 'evidencia_${idx}_${i+1}.jpg')" type="button" style="color:var(--agave-dark);">⬇️</button>
+            <button onclick="quitarFotoGeneralBloque(${idx},${i})" type="button">✕</button>
+          </span>
+        </div>
+      </div>`).join('');
+
+    const kmlHtml = bloque.kmls.map((k,ik)=>{
+      const visual = k.satelite ? construirVistaSatelital(k) : (k.puntos && k.puntos.length>=3 ? construirSvgPoligono(k.puntos) : '');
+      return `<div class="kml-card">
+        <b>${k.placemark||k.archivo}</b>
+        Archivo: ${k.archivo}${k.vertices?' · '+k.vertices+' vértices':''}${k.areaHa?' · ≈ '+k.areaHa.toFixed(2)+' ha':''}
+        ${visual}
+        <div class="kml-remove"><button class="btn btn-danger btn-sm" onclick="quitarKmlBloque(${idx},${ik})" type="button">Quitar este polígono</button></div>
+      </div>`;
+    }).join('');
+
+    const kgBloque = bloque.costales.reduce((s,c)=> s+(parseFloat(c.peso)||0), 0);
+
+    return `
+    <div class="card" style="background:var(--cream);border:1.5px solid var(--ochre);margin-bottom:14px;">
+      <div class="head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <b style="color:var(--ochre-dark);">Parcela adicional #${idx+1}</b>
+        <button class="btn btn-danger btn-sm" onclick="quitarParcelaAdicional(${idx})" type="button">🗑️ Quitar parcela</button>
+      </div>
+
+      <label class="first">Parcela / rancho</label>
+      <select onchange="onParcelaBloqueChange(${idx}, this.value)">${opcionesParcela}</select>
+      <input type="text" id="parcelaBloqueManual_${idx}" placeholder="Nombre de la parcela" value="${bloque.parcelaIdx===''?(bloque.parcela||''):''}" oninput="parcelaBloqueManualCambio(${idx}, this.value)" style="display:${bloque.parcelaIdx===''&&bloque.parcela?'block':'none'};margin-top:6px;">
+      ${bloque.parcela ? `<p class="hint">${bloque.hectareas?bloque.hectareas+' ha · ':''}${bloque.anioPlantacion?'Año '+bloque.anioPlantacion+' · ':''}Inventario: ${(parseFloat(bloque.inventarioParcela)||0).toLocaleString('es-MX')} plantas</p>` : ''}
+
+      <label>Inventario de la parcela</label>
+      <input type="number" min="0" value="${bloque.inventarioParcela}" oninput="bloqueCambio(${idx},'inventarioParcela',this.value)">
+
+      <div class="row2" style="margin-top:8px;">
+        <div><label class="first">Avance en plantas (hoy)</label><input type="number" min="0" value="${bloque.avanceDiarioManual}" oninput="bloqueCambio(${idx},'avanceDiarioManual',this.value)"></div>
+        <div><label class="first">Jornales</label><input type="number" min="0" value="${bloque.jornaleros}" oninput="bloqueCambio(${idx},'jornaleros',this.value)"></div>
+      </div>
+
+      <label style="margin-top:10px;">Costales de esta parcela (${bloque.costales.length} · ${kgBloque.toLocaleString('es-MX')} kg)</label>
+      <button class="btn btn-ghost btn-sm btn-block" onclick="abrirNuevoCostalBloque(${idx})" type="button">+ Registrar costal</button>
+      ${costalesHtml}
+
+      <label style="margin-top:10px;">Evidencias fotográficas de esta parcela</label>
+      <label class="foto-capture-btn" for="fotoGeneralBloque_${idx}" style="margin-top:4px;">
+        📷 Agregar fotografía
+        <input type="file" id="fotoGeneralBloque_${idx}" accept="image/*" capture="environment" style="display:none;" onchange="onFotoGeneralBloque(${idx}, this)">
+      </label>
+      <div class="galeria-general">${evidenciasHtml}</div>
+
+      <label style="margin-top:10px;">Polígono(s) KML de esta parcela</label>
+      <label class="foto-capture-btn" for="kmlInputBloque_${idx}" style="margin-top:4px;">
+        🗺️ Cargar archivo(s) KML
+        <input type="file" id="kmlInputBloque_${idx}" accept=".kml,application/vnd.google-earth.kml+xml" multiple style="display:none;" onchange="onKmlInputBloque(${idx}, this)">
+      </label>
+      ${kmlHtml}
+    </div>`;
+  }).join('');
+}
+
 /* ---------------- Firma del auditor ---------------- */
 let firmaCtx = null, firmaDibujando = false, firmaTieneTrazo = false;
 function initFirma(){
@@ -2647,7 +3200,12 @@ function liberarEspacio(){
     alert('El historial ya está vacío; no hay nada que liberar ahí. Si el error persiste, borra también fotos de la jornada activa que no necesites, o exporta y comienza una jornada nueva.');
     return;
   }
-  if(!confirm(`Vas a exportar un respaldo de los ${historial.length} registro(s) del historial y luego BORRARLOS de este dispositivo para liberar espacio.\n\nEl archivo de respaldo se descargará a tu teléfono antes de borrar nada. ¿Continuar?`)) return;
+  const soloFotos = confirm('¿Cómo quieres liberar espacio?\n\nAceptar = Quitar solo las FOTOS de registros de hace más de 3 días (se conservan todos los datos y el avance acumulado).\nCancelar = Ver la opción de exportar y borrar registros completos.');
+  if(soloFotos){
+    quitarFotosHistorialAntiguo();
+    return;
+  }
+  if(!confirm(`Vas a exportar un respaldo de los ${historial.length} registro(s) del historial y luego BORRARLOS COMPLETOS de este dispositivo (incluye datos y fotos) para liberar espacio.\n\nEl archivo de respaldo se descargará a tu teléfono antes de borrar nada. ¿Continuar?`)) return;
 
   const data = JSON.stringify(historial, null, 2);
   const blob = new Blob([data], {type:'application/json'});
@@ -2665,10 +3223,47 @@ function liberarEspacio(){
     if(confirm('¿Ya se descargó el respaldo? Toca Aceptar para borrar el historial de este dispositivo y liberar espacio (o Cancelar para no borrar nada todavía).')){
       localStorage.removeItem(KEY_HISTORIAL);
       alert('Historial borrado de este dispositivo. Tu respaldo sigue disponible en el archivo descargado.');
+      actualizarIndicadorEspacio();
       if(document.getElementById('historialOverlay')) pintarHistorial();
       if(typeof pintarResumenDiaPrincipal === 'function') pintarResumenDiaPrincipal();
     }
   }, 800);
+}
+// Quita solo las fotografías (no los datos) de los registros del historial de hace más de 3 días.
+// Conserva el avance, jornales, costales, kg, etc. — para que el acumulado de cada parcela no se altere.
+function quitarFotosHistorialAntiguo(){
+  const historial = cargarHistorial();
+  const hoy = new Date();
+  let contador = 0;
+  const limpiar = (v, marcar) => {
+    if(v && typeof v==='string' && v.indexOf('data:')===0){ marcar(); return '[foto eliminada para liberar espacio — disponible en tu respaldo exportado]'; }
+    return v;
+  };
+  historial.forEach(r=>{
+    const fechaStr = (r.fechaHora||'').split(' ')[0];
+    if(!fechaStr) return;
+    const partes = fechaStr.split('/');
+    if(partes.length!==3) return;
+    const fechaReg = new Date(Number(partes[2]), Number(partes[1])-1, Number(partes[0]));
+    const diffDias = (hoy - fechaReg) / (1000*60*60*24);
+    if(diffDias <= 3) return;
+    let tuvoFotos = false;
+    const marcar = ()=>{ tuvoFotos = true; };
+    (r.costales||[]).forEach(c=>{ c.evidenciaFoto = limpiar(c.evidenciaFoto, marcar); });
+    (r.muestrasTestigo||[]).forEach(m=>{ m.antes = limpiar(m.antes, marcar); m.despues = limpiar(m.despues, marcar); });
+    (r.evidenciasGenerales||[]).forEach(ev=>{ ev.dataUrl = limpiar(ev.dataUrl, marcar); });
+    (r.kmls||[]).forEach(k=>{ if(k) k.satelite = limpiar(k.satelite, marcar); });
+    if(r.auditor) r.auditor.firma = limpiar(r.auditor.firma, marcar);
+    if(tuvoFotos) contador++;
+  });
+  if(contador===0){
+    alert('No se encontraron fotos en registros de hace más de 3 días para liberar (o ya estaban vacías). Prueba con la opción de exportar y borrar registros completos si necesitas más espacio.');
+    return;
+  }
+  guardarHistorial(historial);
+  actualizarIndicadorEspacio();
+  alert(`✅ Se quitaron las fotos de ${contador} registro(s) de hace más de 3 días. Todos los datos numéricos y el avance acumulado de cada parcela siguen intactos.`);
+  if(document.getElementById('historialOverlay')) pintarHistorial();
 }
 
 function instalarApp(){
