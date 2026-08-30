@@ -349,6 +349,13 @@
     display:inline-block;font-size:11.5px;background:#fff;border:1px solid var(--line);
     border-radius:20px;padding:2px 9px;margin:2px 4px 2px 0;
   }
+  #resumenAplicadoresLista .aplicador-fila{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:13.5px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+    background:var(--cream);margin-bottom:6px;
+  }
+  #resumenAplicadoresLista .aplicador-fila .nombre{font-weight:600;color:var(--agave-dark);}
+  #resumenAplicadoresLista .aplicador-fila .detalle{font-size:12px;color:#5b6a5f;text-align:right;}
 
   .historial-item{
     border:1px solid var(--line);
@@ -613,36 +620,27 @@
         <div class="v" id="sumMuestras">0</div>
         <div class="l">Muestras testigo</div>
       </div>
+      <div class="stat progress">
+        <div class="v" id="sumPlantasDia">0</div>
+        <div class="l">Plantas fertilizadas hoy (todas las parcelas)</div>
+      </div>
+      <div class="stat">
+        <div class="v" id="sumParcelasDia">1</div>
+        <div class="l">Parcelas trabajadas hoy</div>
+      </div>
     </div>
+
+    <label style="margin-top:14px;">Costales aplicados por persona (todas las parcelas de hoy)</label>
+    <div id="resumenAplicadoresLista"></div>
+    <div class="empty" id="resumenAplicadoresEmpty" style="display:none;">Aún no hay costales capturados con el nombre de quien los aplicó.</div>
 
     <label>Observaciones de la jornada</label>
     <textarea id="observaciones" placeholder="Incidencias, clima, equipo, etc."></textarea>
   </div>
 
-  <!-- 5. OTRAS PARCELAS TRABAJADAS HOY -->
+  <!-- 5. AVANCE DIARIO Y JORNALES -->
   <div class="card">
-    <h2><span class="n">5</span>Otras parcelas trabajadas hoy</h2>
-    <p class="hint" style="margin-top:-6px;">Si el mismo día se trabajan varias parcelas, agrégalas aquí — cada una lleva su propio consumo de costales, evidencias y polígono, sin salir de este formulario. Al guardar, cada parcela queda como su propio registro en el historial (para que el avance acumulado de cada una funcione igual que siempre).</p>
-
-    <button class="btn btn-primary btn-block" onclick="agregarParcelaAdicional()" type="button">+ Agregar otra parcela a esta jornada</button>
-
-    <div id="parcelasAdicionalesLista" style="margin-top:12px;"></div>
-
-    <div class="summary-grid" style="margin-top:14px;">
-      <div class="stat progress">
-        <div class="v" id="sumPlantasTotalDia">0</div>
-        <div class="l">Total de plantas trabajadas hoy (todas las parcelas)</div>
-      </div>
-      <div class="stat water">
-        <div class="v" id="sumKgTotalDia">0 kg</div>
-        <div class="l">Fertilizante consumido (todas las parcelas)</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 6. AVANCE DIARIO Y JORNALES -->
-  <div class="card">
-    <h2><span class="n">6</span>Avance diario y jornales</h2>
+    <h2><span class="n">5</span>Avance diario y jornales</h2>
 
     <label class="first" style="display:flex;align-items:center;gap:8px;font-weight:600;">
       <input type="checkbox" id="dosSupervisoresCheck" onchange="onDosSupervisoresChange(this.checked)" style="width:auto;">
@@ -717,6 +715,15 @@
     </div>
   </div>
 
+  <!-- 6. PARCELAS DE LA JORNADA -->
+  <div class="card">
+    <h2><span class="n">6</span>Parcelas trabajadas en esta jornada</h2>
+    <p class="hint" style="margin-top:-6px;">Si hoy se trabajó en más de una parcela, primero llena las secciones 1 a 5 con los datos de la parcela que acabas de terminar y toca "Agregar esta parcela y capturar otra". Cada parcela guarda sus propios costales, evidencias y polígono por separado; el resumen de abajo suma el total de plantas, costales y kg del día completo.</p>
+    <button class="btn btn-ochre btn-block" onclick="agregarParcelaALaJornada()" type="button">➕ Agregar esta parcela y capturar otra</button>
+    <div id="parcelasDelDiaLista" style="margin-top:12px;"></div>
+    <div class="empty" id="parcelasDelDiaEmpty">Aún no has agregado ninguna parcela adicional. Si solo trabajaste una parcela hoy, ignora esta sección y guarda normalmente.</div>
+  </div>
+
   <!-- 7. RESUMEN GENERAL DEL DÍA (VARIAS PARCELAS) -->
   <div class="card">
     <h2><span class="n">7</span>Resumen general del día</h2>
@@ -756,7 +763,7 @@
 <div class="actions-sticky no-print">
   <button class="btn btn-primary" onclick="guardarFormularioDelDia()">💾 Guardar</button>
   <button class="btn btn-ghost" onclick="abrirHistorial()">🗂️ Historial</button>
-  <button class="btn btn-ochre" onclick="generarPdfRegistro(estado)">📄 PDF</button>
+  <button class="btn btn-ochre" onclick="generarPdfDesdeFormulario()">📄 PDF</button>
   <button class="btn btn-danger" onclick="nuevaJornada()">Nueva jornada</button>
 </div>
 
@@ -967,14 +974,13 @@ let estado = {
   hectareasSup2: '', jornalesSup2: '',
   evidenciaSupervisorActivo: 1,
   pesoCostalDefault: 50,
+  parcelasDelDia: [],      // parcelas de esta MISMA jornada ya agregadas (ver 'Parcelas trabajadas en esta jornada')
   costales: [],           // {numero, hora, peso, aplicadoPor, evidenciaFoto}
   muestrasTestigo: [],    // {numero, antes, despues}
   evidenciasGenerales: [], // [{dataUrl, hora}]
   kmls: [],    // [{archivo, placemark, vertices, areaHa, puntos}]
   auditor: {nombre:'Jorge López Carranza', firma:null, fecha:''},
   observaciones: '',
-  parcelasAdicionales: [], // [{id, parcela, parcelaIdx, hectareas, anioPlantacion, inventarioParcela,
-                            //   costales, evidenciasGenerales, kmls, avanceDiarioManual, jornaleros, _historialLinkId}]
   _editandoHistorialId: null
 };
 
@@ -1045,7 +1051,9 @@ function iniciar(){
   // en la que realmente comenzaste esa jornada, aunque sigas trabajando en ella al día siguiente.
   const hoyStr = fmtFechaHora(new Date()).split(' ')[0];
   const fechaActualStr = estado.fechaHora ? estado.fechaHora.split(' ')[0] : '';
-  const borradorVacio = (!estado.parcela || estado.parcela.trim()==='') && (estado.costales||[]).length===0;
+  if(!estado.parcelasDelDia) estado.parcelasDelDia = [];
+  delete estado.parcelas; // se reconstruye solo al guardar/exportar, no se conserva en el borrador activo
+  const borradorVacio = !jornadaTieneContenido();
   if(!estado.fechaHora || (!estado._editandoHistorialId && borradorVacio && fechaActualStr !== hoyStr)){
     estado.fechaHora = fmtFechaHora(new Date());
   }
@@ -1057,18 +1065,6 @@ function iniciar(){
     estado.kmls = estado.kml ? [estado.kml] : []; // compatibilidad con registros guardados antes de este cambio
   }
   if(!estado.auditor) estado.auditor = {nombre:'Jorge López Carranza', firma:null, fecha:''};
-  if(!estado.parcelasAdicionales) estado.parcelasAdicionales = [];
-  estado.parcelasAdicionales.forEach(b=>{
-    if(!b.costales) b.costales = [];
-    if(!b.evidenciasGenerales) b.evidenciasGenerales = [];
-    if(!b.kmls) b.kmls = [];
-    if(b.pesoCostalDefault === undefined || b.pesoCostalDefault === null || b.pesoCostalDefault === '') b.pesoCostalDefault = 50;
-    b.costales.forEach(c=>{
-      if(c.peso === undefined || c.peso === null || c.peso === '') c.peso = b.pesoCostalDefault;
-      if(c.aplicadoPor === undefined) c.aplicadoPor = '';
-      if(c.evidenciaFoto === undefined) c.evidenciaFoto = null;
-    });
-  });
   estado.costales.forEach(c=>{
     if(c.peso === undefined || c.peso === null || c.peso === '') c.peso = estado.pesoCostalDefault;
     if(c.aplicadoPor === undefined) c.aplicadoPor = '';
@@ -1125,7 +1121,7 @@ function iniciar(){
   pintarMuestrasTestigo();
   pintarGaleriaGeneral();
   pintarKmlInfo();
-  pintarParcelasAdicionales();
+  pintarParcelasDelDia();
   initFirma();
   actualizarResumen();
   actualizarIndicadorEspacio();
@@ -1427,10 +1423,16 @@ function abrirNuevoCostal(){
 function obtenerSiguienteNumeroCostal(){
   let maxNum = 0;
   estado.costales.forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; });
+  // también revisa las otras parcelas ya agregadas a esta misma jornada, por si es la misma parcela repetida
+  (estado.parcelasDelDia||[]).forEach(p=>{
+    if(p.parcela === estado.parcela){ (p.costales||[]).forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; }); }
+  });
   if(estado.parcela){
-    const historial = cargarHistorial().filter(r=> r.parcela === estado.parcela && r._id !== estado._editandoHistorialId);
+    const historial = cargarHistorial().filter(r=> r._id !== estado._editandoHistorialId);
     historial.forEach(r=>{
-      (r.costales||[]).forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; });
+      parcelasDe(r).forEach(p=>{
+        if(p.parcela === estado.parcela){ (p.costales||[]).forEach(c=>{ if((c.numero||0) > maxNum) maxNum = c.numero; }); }
+      });
     });
   }
   return maxNum + 1;
@@ -1618,6 +1620,257 @@ function pintarMuestrasTestigo(){
   `).join('');
 }
 
+/* ---------------- Varias parcelas en una misma jornada ---------------- */
+// Toma los campos de captura actuales (secciones 1 a 5) y arma un "item de parcela" independiente
+function construirItemParcelaActual(){
+  return {
+    parcela: estado.parcela, parcelaIdx: estado.parcelaIdx,
+    hectareas: estado.hectareas, anioPlantacion: estado.anioPlantacion,
+    inventarioParcela: estado.inventarioParcela,
+    supervisor: estado.supervisor,
+    ubicacion: estado.ubicacion,
+    pesoCostalDefault: estado.pesoCostalDefault,
+    costales: estado.costales, muestrasTestigo: estado.muestrasTestigo,
+    evidenciasGenerales: estado.evidenciasGenerales, kmls: estado.kmls,
+    avanceDiarioManual: estado.avanceDiarioManual, jornaleros: estado.jornaleros,
+    dosSupervisores: estado.dosSupervisores, supervisor2: estado.supervisor2, supervisor2Idx: estado.supervisor2Idx,
+    densidadPlantacion: estado.densidadPlantacion,
+    hectareasSup1: estado.hectareasSup1, jornalesSup1: estado.jornalesSup1,
+    hectareasSup2: estado.hectareasSup2, jornalesSup2: estado.jornalesSup2,
+    evidenciaSupervisorActivo: estado.evidenciaSupervisorActivo
+  };
+}
+function parcelaActualTieneContenido(){
+  return (estado.parcela && estado.parcela.trim()!=='') || (estado.costales||[]).length>0;
+}
+// La jornada tiene algo que guardar si la parcela que se está capturando ahora tiene datos,
+// o si ya se agregaron otras parcelas a la lista de esta misma jornada.
+function jornadaTieneContenido(){
+  return parcelaActualTieneContenido() || (estado.parcelasDelDia && estado.parcelasDelDia.length>0);
+}
+// Limpia los campos de captura (secciones 1 a 5) para poder capturar la siguiente parcela de la jornada
+function reiniciarCamposParcelaActual(){
+  estado.parcela=''; estado.parcelaIdx=''; estado.hectareas=''; estado.anioPlantacion=''; estado.inventarioParcela='';
+  estado.ubicacion=null;
+  estado.costales=[]; estado.muestrasTestigo=[]; estado.evidenciasGenerales=[]; estado.kmls=[];
+  estado.avanceDiarioManual=''; estado.jornaleros='';
+  estado.dosSupervisores=false; estado.supervisor2=''; estado.supervisor2Idx=''; estado.densidadPlantacion='';
+  estado.hectareasSup1=''; estado.jornalesSup1=''; estado.hectareasSup2=''; estado.jornalesSup2='';
+  estado.evidenciaSupervisorActivo=1;
+}
+// Vuelca un item de parcela (guardado en parcelasDelDia, o de un registro del historial) en los campos de captura
+function cargarItemParcelaComoActual(item){
+  estado.parcela = item.parcela||''; estado.parcelaIdx = (item.parcelaIdx!==undefined && item.parcelaIdx!==null) ? item.parcelaIdx : '';
+  estado.hectareas = item.hectareas||''; estado.anioPlantacion = item.anioPlantacion||''; estado.inventarioParcela = item.inventarioParcela||'';
+  estado.supervisor = item.supervisor || estado.supervisor;
+  estado.ubicacion = item.ubicacion || null;
+  estado.pesoCostalDefault = item.pesoCostalDefault || estado.pesoCostalDefault || 50;
+  estado.costales = item.costales || []; estado.muestrasTestigo = item.muestrasTestigo || [];
+  estado.evidenciasGenerales = item.evidenciasGenerales || []; estado.kmls = item.kmls || [];
+  estado.avanceDiarioManual = item.avanceDiarioManual || ''; estado.jornaleros = item.jornaleros || '';
+  estado.dosSupervisores = !!item.dosSupervisores; estado.supervisor2 = item.supervisor2||''; estado.supervisor2Idx = item.supervisor2Idx||'';
+  estado.densidadPlantacion = item.densidadPlantacion||'';
+  estado.hectareasSup1 = item.hectareasSup1||''; estado.jornalesSup1 = item.jornalesSup1||'';
+  estado.hectareasSup2 = item.hectareasSup2||''; estado.jornalesSup2 = item.jornalesSup2||'';
+  estado.evidenciaSupervisorActivo = item.evidenciaSupervisorActivo || 1;
+}
+// Vuelve a pintar solo los campos y listas ligados a "la parcela que se está capturando ahora"
+// (sin tocar fecha, jefe de área, auditor, firma u observaciones, que son de toda la jornada)
+function repintarCamposParcela(){
+  document.getElementById('inventarioParcela').value = estado.inventarioParcela || '';
+  document.getElementById('pesoCostalDefault').value = estado.pesoCostalDefault || 50;
+
+  document.getElementById('dosSupervisoresCheck').checked = !!estado.dosSupervisores;
+  document.getElementById('unSupervisorBox').style.display = estado.dosSupervisores ? 'none' : 'block';
+  document.getElementById('dosSupervisoresBox').style.display = estado.dosSupervisores ? 'block' : 'none';
+  document.getElementById('densidadPlantacion').value = estado.densidadPlantacion || '';
+  document.getElementById('hectareasSup1').value = estado.hectareasSup1 || '';
+  document.getElementById('jornalesSup1').value = estado.jornalesSup1 || '';
+  document.getElementById('hectareasSup2').value = estado.hectareasSup2 || '';
+  document.getElementById('jornalesSup2').value = estado.jornalesSup2 || '';
+  document.getElementById('etiquetaSupervisorBox').style.display = estado.dosSupervisores ? 'block' : 'none';
+  poblarSelectRol(document.getElementById('supervisorSelect2'), cargarCatalogo(KEY_CATALOGO_SUPERVISORES, DEFAULT_SUPERVISORES), estado.supervisor2);
+  pintarBotonesSupervisorActivo();
+
+  const pSel = document.getElementById('parcelaSelect');
+  const manual = document.getElementById('parcelaManual');
+  if(estado.parcelaIdx !== '' && estado.parcelaIdx !== null && estado.parcelaIdx !== undefined){
+    pSel.value = String(estado.parcelaIdx);
+    manual.style.display='none'; manual.value='';
+    mostrarInfoParcela(INVENTARIO[estado.parcelaIdx]);
+  }else if(estado.parcela){
+    pSel.value = 'otra';
+    manual.style.display='block';
+    manual.value = estado.parcela;
+  }else{
+    pSel.value = '';
+    manual.style.display='none'; manual.value='';
+    document.getElementById('parcelaInfoHint').textContent = 'Selecciona una parcela del catálogo para autocompletar el inventario, el año de plantación y las hectáreas.';
+  }
+
+  if(estado.ubicacion){
+    pintarUbicacion(estado.ubicacion);
+  }else{
+    const box = document.getElementById('geoBox');
+    box.className = 'geo-box';
+    document.getElementById('geoTxt').textContent = 'Ubicación no capturada';
+    document.getElementById('geoSub').textContent = 'Toca "Capturar ubicación" al llegar a la parcela';
+  }
+
+  document.getElementById('avanceDiario').value = estado.avanceDiarioManual || '';
+  document.getElementById('jornalerosReq').value = estado.jornaleros || '';
+
+  pintarCostales();
+  pintarMuestrasTestigo();
+  pintarGaleriaGeneral();
+  pintarKmlInfo();
+}
+// Cuenta las evidencias fotográficas de un item de parcela (costales + muestras + evidencias generales)
+function contarFotosItemParcela(p){
+  let n = 0;
+  (p.costales||[]).forEach(c=>{ if(c.evidenciaFoto) n++; });
+  (p.muestrasTestigo||[]).forEach(m=>{ if(m.antes) n++; if(m.despues) n++; });
+  n += (p.evidenciasGenerales||[]).length;
+  return n;
+}
+// Suma los totales de TODA la jornada activa: la parcela que se está capturando ahora + las ya agregadas a la lista
+// Suma cuántos costales aplicó cada persona (campo "Aplicado por" de cada costal), sumando
+// TODAS las parcelas de la jornada activa (la que se está capturando ahora + las ya agregadas).
+function calcularResumenPorAplicador(){
+  const items = [...(estado.parcelasDelDia||[]), construirItemParcelaActual()];
+  const porNombre = {}; // nombre -> {costales, kg}
+  items.forEach(p=>{
+    (p.costales||[]).forEach(c=>{
+      const nombre = (c.aplicadoPor && c.aplicadoPor.trim()) ? c.aplicadoPor.trim() : 'Sin nombre registrado';
+      if(!porNombre[nombre]) porNombre[nombre] = {costales:0, kg:0};
+      porNombre[nombre].costales += 1;
+      porNombre[nombre].kg += parseFloat(c.peso) || 0;
+    });
+  });
+  // ordenado de mayor a menor número de costales aplicados
+  return Object.keys(porNombre)
+    .map(nombre=>({nombre, costales:porNombre[nombre].costales, kg:porNombre[nombre].kg}))
+    .sort((a,b)=> b.costales - a.costales);
+}
+// Pinta la tabla "Costales aplicados por persona" dentro del resumen general de la jornada (sección 4)
+function pintarResumenAplicadores(){
+  const cont = document.getElementById('resumenAplicadoresLista');
+  const empty = document.getElementById('resumenAplicadoresEmpty');
+  if(!cont) return;
+  const resumen = calcularResumenPorAplicador();
+  if(resumen.length===0){ cont.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+  cont.innerHTML = resumen.map(r=>`
+    <div class="aplicador-fila">
+      <span class="nombre">${r.nombre}</span>
+      <span class="detalle">${r.costales} costal${r.costales===1?'':'es'} · ${r.kg.toLocaleString('es-MX')} kg</span>
+    </div>
+  `).join('');
+}
+// Suma cuántos costales aplicó cada persona en TODO un registro guardado (uno o varias parcelas)
+function calcularResumenPorAplicadorRegistro(r){
+  const items = parcelasDe(r);
+  const porNombre = {};
+  items.forEach(p=>{
+    (p.costales||[]).forEach(c=>{
+      const nombre = (c.aplicadoPor && c.aplicadoPor.trim()) ? c.aplicadoPor.trim() : 'Sin nombre registrado';
+      if(!porNombre[nombre]) porNombre[nombre] = {costales:0, kg:0};
+      porNombre[nombre].costales += 1;
+      porNombre[nombre].kg += parseFloat(c.peso) || 0;
+    });
+  });
+  return Object.keys(porNombre)
+    .map(nombre=>({nombre, costales:porNombre[nombre].costales, kg:porNombre[nombre].kg}))
+    .sort((a,b)=> b.costales - a.costales);
+}
+// Suma cuántos costales aplicó cada persona en TODOS los items de parcela de un día (varios registros)
+function totalesJornadaCompleta(){
+  const items = [...(estado.parcelasDelDia||[]), construirItemParcelaActual()];
+  let totalCostales=0, kgTotal=0, totalFotos=0, totalMuestras=0, totalPlantas=0;
+  items.forEach(p=>{
+    totalCostales += (p.costales||[]).length;
+    kgTotal += (p.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+    totalFotos += contarFotosItemParcela(p);
+    totalMuestras += (p.muestrasTestigo||[]).length;
+    totalPlantas += parseFloat(p.avanceDiarioManual)||0;
+  });
+  return {totalCostales, kgTotal, totalFotos, totalMuestras, totalPlantas, totalParcelas: items.length};
+}
+// Agrega la parcela que se está capturando ahora a la lista de parcelas de esta jornada,
+// y deja los campos en blanco listos para capturar la siguiente parcela trabajada hoy.
+function agregarParcelaALaJornada(){
+  if(!parcelaActualTieneContenido()){
+    alert('Primero captura al menos la parcela o un costal (secciones 1 a 5) antes de agregarla a la jornada.');
+    return;
+  }
+  estado.parcelasDelDia.push(construirItemParcelaActual());
+  reiniciarCamposParcelaActual();
+  guardar();
+  repintarCamposParcela();
+  pintarParcelasDelDia();
+  actualizarResumen();
+  window.scrollTo({top:0, behavior:'smooth'});
+  alert('✅ Parcela agregada a esta jornada. Ahora puedes capturar la siguiente parcela trabajada hoy en las secciones 1 a 5; al guardar, todas quedarán en el mismo reporte.');
+}
+function quitarParcelaDelDia(idx){
+  if(!confirm('¿Quitar esta parcela de la jornada? Se perderán sus costales, evidencias y polígono capturados.')) return;
+  estado.parcelasDelDia.splice(idx,1);
+  guardar();
+  pintarParcelasDelDia();
+  actualizarResumen();
+}
+// Trae de vuelta a los campos de captura una parcela ya agregada a la lista, para poder corregirla
+function editarParcelaDelDia(idx){
+  if(parcelaActualTieneContenido()){
+    if(!confirm('La parcela que estás capturando ahora mismo en pantalla se agregará primero a la lista, y luego se abrirá la parcela que quieres editar. ¿Continuar?')) return;
+    estado.parcelasDelDia.push(construirItemParcelaActual());
+  }
+  const item = estado.parcelasDelDia.splice(idx,1)[0];
+  cargarItemParcelaComoActual(item);
+  guardar();
+  repintarCamposParcela();
+  pintarParcelasDelDia();
+  actualizarResumen();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+// Pinta la lista de parcelas ya agregadas a esta jornada (sección 6)
+function pintarParcelasDelDia(){
+  const cont = document.getElementById('parcelasDelDiaLista');
+  const empty = document.getElementById('parcelasDelDiaEmpty');
+  if(!cont) return;
+  if(!estado.parcelasDelDia || !estado.parcelasDelDia.length){ cont.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  cont.innerHTML = estado.parcelasDelDia.map((p, idx)=>{
+    const kg = (p.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+    const fotos = contarFotosItemParcela(p);
+    const kmlsN = (p.kmls||[]).length;
+    return `<div class="tambo-card">
+      <div class="head">
+        <span>${p.parcela || 'Sin nombre'}</span>
+        <span>
+          <button class="btn btn-ghost btn-sm" onclick="editarParcelaDelDia(${idx})" type="button" style="margin-right:4px;">✏️ Editar</button>
+          <button class="del" onclick="quitarParcelaDelDia(${idx})" type="button">✕</button>
+        </span>
+      </div>
+      <div class="meta">${(parseFloat(p.avanceDiarioManual)||0).toLocaleString('es-MX')} plantas · ${(p.costales||[]).length} costales (${kg.toLocaleString('es-MX')} kg) · ${fotos} evidencias · ${kmlsN} polígono(s)</div>
+    </div>`;
+  }).join('');
+}
+// Convierte cualquier registro guardado (nuevo, con .parcelas; o antiguo, de una sola parcela) en una
+// lista de items de parcela, para poder recorrerlos siempre de la misma forma.
+function parcelasDe(r){
+  if(r.parcelas && r.parcelas.length) return r.parcelas;
+  return [{
+    parcela:r.parcela, parcelaIdx:r.parcelaIdx, hectareas:r.hectareas, anioPlantacion:r.anioPlantacion,
+    inventarioParcela:r.inventarioParcela, supervisor:r.supervisor, ubicacion:r.ubicacion,
+    pesoCostalDefault:r.pesoCostalDefault, costales:r.costales||[], muestrasTestigo:r.muestrasTestigo||[],
+    evidenciasGenerales:r.evidenciasGenerales||[], kmls:(r.kmls&&r.kmls.length)?r.kmls:(r.kml?[r.kml]:[]),
+    avanceDiarioManual:r.avanceDiarioManual, jornaleros:r.jornaleros, dosSupervisores:r.dosSupervisores,
+    supervisor2:r.supervisor2, supervisor2Idx:r.supervisor2Idx, densidadPlantacion:r.densidadPlantacion,
+    hectareasSup1:r.hectareasSup1, jornalesSup1:r.jornalesSup1, hectareasSup2:r.hectareasSup2, jornalesSup2:r.jornalesSup2,
+    evidenciaSupervisorActivo:r.evidenciaSupervisorActivo
+  }];
+}
 
 /* ---------------- Resumen ---------------- */
 // Semaforización del avance acumulado: rojo por debajo de 71%, amarillo de 71% a 99%, verde de 100% en adelante
@@ -1675,16 +1928,16 @@ function actualizarResumen(){
   }
   const avanceDiario = parseFloat(estado.avanceDiarioManual) || 0;
 
-  document.getElementById('sumCostales').textContent = totalCostales;
-  document.getElementById('sumKg').textContent = kgTotal.toLocaleString('es-MX') + ' kg';
-
-  // evidencias fotográficas y muestras testigo
-  let totalFotosCostales = 0;
-  estado.costales.forEach(c=>{ if(c.evidenciaFoto) totalFotosCostales++; });
-  let totalFotosMuestras = 0;
-  estado.muestrasTestigo.forEach(m=>{ if(m.antes) totalFotosMuestras++; if(m.despues) totalFotosMuestras++; });
-  document.getElementById('sumEvidencias').textContent = totalFotosCostales + totalFotosMuestras + estado.evidenciasGenerales.length;
-  document.getElementById('sumMuestras').textContent = estado.muestrasTestigo.length;
+  // Los totales de la jornada (sección 4) suman la parcela que se está capturando ahora
+  // MÁS todas las parcelas ya agregadas a esta misma jornada (sección 6).
+  const totalesJornada = totalesJornadaCompleta();
+  document.getElementById('sumCostales').textContent = totalesJornada.totalCostales;
+  document.getElementById('sumKg').textContent = totalesJornada.kgTotal.toLocaleString('es-MX') + ' kg';
+  document.getElementById('sumEvidencias').textContent = totalesJornada.totalFotos;
+  document.getElementById('sumMuestras').textContent = totalesJornada.totalMuestras;
+  document.getElementById('sumPlantasDia').textContent = totalesJornada.totalPlantas.toLocaleString('es-MX');
+  document.getElementById('sumParcelasDia').textContent = totalesJornada.totalParcelas;
+  pintarResumenAplicadores();
 
   // avance diario y jornales (sección 5): rendimiento contra el estándar de 1,500 plantas/jornal
   const promedioJornal = (jornaleros>0 && avanceDiario>0) ? (avanceDiario/jornaleros) : 0;
@@ -1696,28 +1949,25 @@ function actualizarResumen(){
   // avance acumulado de la parcela (todas las jornadas guardadas + hoy) y restante contra el inventario
   actualizarAcumuladoParcela();
 
-  // total combinado del día: parcela principal + todas las parcelas adicionales
-  let plantasTotalDia = avanceDiario;
-  let kgTotalDia = kgTotal;
-  (estado.parcelasAdicionales||[]).forEach(b=>{
-    plantasTotalDia += parseFloat(b.avanceDiarioManual) || 0;
-    kgTotalDia += b.costales.reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
-  });
-  const elPlantasDia = document.getElementById('sumPlantasTotalDia');
-  const elKgDia = document.getElementById('sumKgTotalDia');
-  if(elPlantasDia) elPlantasDia.textContent = Math.round(plantasTotalDia).toLocaleString('es-MX');
-  if(elKgDia) elKgDia.textContent = kgTotalDia.toLocaleString('es-MX') + ' kg';
-
   if(typeof pintarResumenDiaPrincipal === 'function') pintarResumenDiaPrincipal();
 }
 
-// Suma el avance diario de todas las jornadas guardadas de esta misma parcela (cualquier fecha) + el avance de hoy
+// Suma el avance diario de todas las jornadas guardadas de esta misma parcela (cualquier fecha) + el avance de hoy.
+// Como un registro guardado puede tener varias parcelas (ver parcelasDe), se busca dentro de cada una de ellas
+// y solo se cuentan las que coinciden por nombre con la parcela que se está capturando ahora mismo.
 function calcularAvanceAcumuladoParcela(){
   if(!estado.parcela) return {acumulado:0, dias:0};
-  const historial = cargarHistorial().filter(r=> r.parcela === estado.parcela && r._id !== estado._editandoHistorialId);
-  const acumuladoAnterior = historial.reduce((s,r)=> s + (parseFloat(r.avanceDiarioManual)||0), 0);
+  const historial = cargarHistorial().filter(r=> r._id !== estado._editandoHistorialId);
+  let acumuladoAnterior = 0, dias = 0;
+  historial.forEach(r=>{
+    let sumaEnEsteRegistro = 0, coincide = false;
+    parcelasDe(r).forEach(p=>{
+      if(p.parcela === estado.parcela){ coincide = true; sumaEnEsteRegistro += (parseFloat(p.avanceDiarioManual)||0); }
+    });
+    if(coincide){ acumuladoAnterior += sumaEnEsteRegistro; dias++; }
+  });
   const acumulado = acumuladoAnterior + (parseFloat(estado.avanceDiarioManual) || 0);
-  return {acumulado, dias: historial.length + 1};
+  return {acumulado, dias: dias + 1};
 }
 function actualizarAcumuladoParcela(){
   const cont = document.getElementById('acumuladoParcelaContenido');
@@ -1853,16 +2103,17 @@ function importarJSON(inputEl){
 
 /* ---------------- Nueva jornada ---------------- */
 function nuevaJornada(){
-  if(!confirm('¿Cerrar esta jornada y comenzar una nueva captura? Se guardará una copia de todas las parcelas de hoy en el historial y podrás consultarlas y generar su PDF cuando quieras.')) return;
-  archivarTodasLasParcelasDeLaJornada();
+  if(!confirm('¿Cerrar esta jornada y comenzar una nueva captura? Se guardará una copia en el historial y podrás consultarla y generar su PDF cuando quieras.')) return;
+  archivarJornadaActual();
   localStorage.removeItem(STORAGE_KEY);
   estado = {
     fechaHora:'', jefeArea:'', supervisor:'', tipoFertilizante:'', parcela:'',
     parcelaIdx:'', hectareas:'', anioPlantacion:'', inventarioParcela:'', ubicacion:null,
     avanceDiarioManual:'', jornaleros:'', pesoCostalDefault: estado.pesoCostalDefault||50,
+    parcelasDelDia: [],
     costales:[], muestrasTestigo:[], evidenciasGenerales:[], kmls:[],
     auditor:{nombre:'Jorge López Carranza', firma:null, fecha:''},
-    observaciones:'', parcelasAdicionales:[], _editandoHistorialId:null
+    observaciones:'', _editandoHistorialId:null
   };
   iniciar();
 }
@@ -1887,10 +2138,24 @@ function guardarHistorial(arr){
   }
 }
 function archivarJornadaActual(){
-  const tieneContenido = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
+  const tieneContenido = jornadaTieneContenido();
   if(!tieneContenido) return false;
   const historial = cargarHistorial();
   const copia = JSON.parse(JSON.stringify(estado));
+  // arma la lista completa de parcelas de esta jornada: las ya agregadas + la que se está capturando ahora mismo
+  const itemsParcelas = (copia.parcelasDelDia||[]).slice();
+  if((copia.parcela && copia.parcela.trim()!=='') || (copia.costales||[]).length>0){
+    itemsParcelas.push({
+      parcela: copia.parcela, parcelaIdx: copia.parcelaIdx, hectareas: copia.hectareas, anioPlantacion: copia.anioPlantacion,
+      inventarioParcela: copia.inventarioParcela, supervisor: copia.supervisor, ubicacion: copia.ubicacion,
+      pesoCostalDefault: copia.pesoCostalDefault, costales: copia.costales, muestrasTestigo: copia.muestrasTestigo,
+      evidenciasGenerales: copia.evidenciasGenerales, kmls: copia.kmls, avanceDiarioManual: copia.avanceDiarioManual,
+      jornaleros: copia.jornaleros, dosSupervisores: copia.dosSupervisores, supervisor2: copia.supervisor2, supervisor2Idx: copia.supervisor2Idx,
+      densidadPlantacion: copia.densidadPlantacion, hectareasSup1: copia.hectareasSup1, jornalesSup1: copia.jornalesSup1,
+      hectareasSup2: copia.hectareasSup2, jornalesSup2: copia.jornalesSup2, evidenciaSupervisorActivo: copia.evidenciaSupervisorActivo
+    });
+  }
+  copia.parcelas = itemsParcelas;
   const fechaActual = extraerFecha(estado.fechaHora);
 
   // 1) si ya se está editando un registro puntual, se actualiza ese
@@ -1921,103 +2186,20 @@ function archivarJornadaActual(){
   return ok;
 }
 
-// Convierte un bloque de "parcela adicional" en un registro completo del historial, reutilizando
-// los datos compartidos de la jornada (fecha, jefe de área, supervisor, auditor, etc.), y lo guarda
-// con la misma lógica de "actualizar si ya existe" que la parcela principal.
-function archivarParcelaAdicional(bloque){
-  const tieneContenido = (bloque.parcela && bloque.parcela.trim()!=='') || bloque.costales.length>0;
-  if(!tieneContenido) return false;
-
-  const registro = {
-    fechaHora: estado.fechaHora,
-    jefeArea: estado.jefeArea, supervisor: estado.supervisor,
-    tipoFertilizante: estado.tipoFertilizante,
-    parcela: bloque.parcela, parcelaIdx: bloque.parcelaIdx,
-    hectareas: bloque.hectareas, anioPlantacion: bloque.anioPlantacion,
-    inventarioParcela: bloque.inventarioParcela,
-    ubicacion: estado.ubicacion,
-    avanceDiarioManual: bloque.avanceDiarioManual, jornaleros: bloque.jornaleros,
-    dosSupervisores: false,
-    pesoCostalDefault: bloque.pesoCostalDefault,
-    costales: bloque.costales, muestrasTestigo: [],
-    evidenciasGenerales: bloque.evidenciasGenerales, kmls: bloque.kmls,
-    auditor: estado.auditor,
-    observaciones: estado.observaciones ? (estado.observaciones + ' [parcela adicional de la misma jornada]') : '[parcela adicional de la misma jornada]'
-  };
-
-  const historial = cargarHistorial();
-  const fechaActual = extraerFecha(registro.fechaHora);
-  const copia = JSON.parse(JSON.stringify(registro));
-
-  let idxExistente = bloque._historialLinkId ? historial.findIndex(r=>r._id === bloque._historialLinkId) : -1;
-  if(idxExistente === -1 && registro.parcela){
-    idxExistente = historial.findIndex(r=> extraerFecha(r.fechaHora)===fechaActual && r.parcela===registro.parcela);
-  }
-
-  if(idxExistente !== -1){
-    copia._id = historial[idxExistente]._id;
-    copia._archivadoEn = fmtFechaHora(new Date());
-    historial[idxExistente] = copia;
-    bloque._historialLinkId = copia._id;
-    return guardarHistorial(historial);
-  }
-
-  copia._id = 'jornada_' + Date.now() + '_' + Math.floor(Math.random()*10000);
-  copia._archivadoEn = fmtFechaHora(new Date());
-  historial.push(copia);
-  bloque._historialLinkId = copia._id;
-  return guardarHistorial(historial);
-}
-// Guarda la parcela principal y todas las parcelas adicionales de la jornada, cada una como su
-// propio registro del historial (para que el acumulado de cada parcela funcione igual que siempre).
-function archivarTodasLasParcelasDeLaJornada(){
-  const okPrincipal = archivarJornadaActual();
-  let okAdicionales = true;
-  (estado.parcelasAdicionales||[]).forEach(bloque=>{
-    const ok = archivarParcelaAdicional(bloque);
-    if(!ok) okAdicionales = false;
-  });
-  guardar(); // guarda los _historialLinkId asignados a cada bloque
-  return okPrincipal && okAdicionales;
-}
-
 // Botón "Guardar": archiva/actualiza el registro de esta parcela y fecha en el historial,
 // sin borrar ni cerrar la jornada, para poder seguir capturando durante el día.
 function guardarFormularioDelDia(){
-  const tieneContenidoPrincipal = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
-  const tieneAdicionales = (estado.parcelasAdicionales||[]).some(b=> (b.parcela && b.parcela.trim()!=='') || b.costales.length>0);
-  if(!tieneContenidoPrincipal && !tieneAdicionales){
+  const tieneContenido = jornadaTieneContenido();
+  if(!tieneContenido){
     alert('Todavía no hay nada que guardar: captura al menos una parcela o un costal.');
     return;
   }
-  const ok = archivarTodasLasParcelasDeLaJornada();
+  const ok = archivarJornadaActual();
   if(ok){
-    const totalParcelas = 1 + (estado.parcelasAdicionales||[]).length;
-    alert(`✅ Guardado en el historial (${fmtFechaHora(new Date())}) — ${totalParcelas} parcela(s) de esta jornada.\n\nPuedes seguir capturando; cada vez que toques "Guardar" se actualiza cada registro (no se duplica).`);
+    alert('✅ Guardado en el historial (' + fmtFechaHora(new Date()) + ').\n\nPuedes seguir capturando costales en esta misma parcela, o agregar otra parcela trabajada hoy en la sección 6. Cada vez que toques "Guardar" se actualiza este mismo registro con todas sus parcelas (no se duplica).');
     pintarResumenDiaPrincipal();
     sincronizarAutomaticoSilencioso();
-    sincronizarAdicionalesSilencioso();
   }
-}
-// Sube en silencio a la nube (si hay URL configurada) cada parcela adicional guardada
-function sincronizarAdicionalesSilencioso(){
-  const url = obtenerUrlSync();
-  if(!url || !navigator.onLine) return;
-  (estado.parcelasAdicionales||[]).forEach(bloque=>{
-    if(!bloque.parcela) return;
-    try{
-      const registro = {
-        _id: bloque._historialLinkId, fechaHora: estado.fechaHora,
-        jefeArea: estado.jefeArea, supervisor: estado.supervisor, tipoFertilizante: estado.tipoFertilizante,
-        parcela: bloque.parcela, inventarioParcela: bloque.inventarioParcela,
-        avanceDiarioManual: bloque.avanceDiarioManual, jornaleros: bloque.jornaleros,
-        costales: bloque.costales, observaciones: '[parcela adicional]'
-      };
-      const payload = despojarFotos(registro);
-      payload.hoja = NOMBRE_HOJA_SYNC;
-      fetch(url, {method:'POST', body: JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}}).catch(()=>{});
-    }catch(e){}
-  });
 }
 // Si ya se configuró una URL de sincronización, sube este registro solo, sin molestar con mensajes
 // (no bloquea ni avisa si falla; es un respaldo de cortesía además del guardado local).
@@ -2025,7 +2207,10 @@ function sincronizarAutomaticoSilencioso(){
   const url = obtenerUrlSync();
   if(!url || !navigator.onLine) return;
   try{
-    const payload = despojarFotos(estado);
+    const historial = cargarHistorial();
+    const registro = estado._editandoHistorialId ? historial.find(r=>r._id===estado._editandoHistorialId) : historial[historial.length-1];
+    if(!registro) return;
+    const payload = despojarFotos(registro);
     payload.hoja = NOMBRE_HOJA_SYNC;
     fetch(url, {method:'POST', body: JSON.stringify(payload), headers:{'Content-Type':'text/plain;charset=utf-8'}}).catch(()=>{});
   }catch(e){}
@@ -2034,7 +2219,7 @@ function sincronizarAutomaticoSilencioso(){
 function abrirHistorial(){
   const historial = cargarHistorial();
   const filtro = document.getElementById('historialFiltroParcela');
-  const parcelas = Array.from(new Set(historial.map(r=>r.parcela).filter(Boolean))).sort();
+  const parcelas = Array.from(new Set(historial.flatMap(r=>parcelasDe(r).map(p=>p.parcela)).filter(Boolean))).sort();
   filtro.innerHTML = '<option value="">Todas las parcelas</option>' + parcelas.map(p=>`<option value="${p}">${p}</option>`).join('');
   pintarHistorial();
   document.getElementById('syncUrlInput').value = obtenerUrlSync();
@@ -2043,7 +2228,7 @@ function abrirHistorial(){
   // fechas disponibles para el resumen general del día
   const fechas = new Set(historial.map(r=>extraerFecha(r.fechaHora)).filter(Boolean));
   const fechaActual = extraerFecha(estado.fechaHora);
-  const actualTieneContenido = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
+  const actualTieneContenido = jornadaTieneContenido();
   if(fechaActual && actualTieneContenido) fechas.add(fechaActual);
   const listaFechas = Array.from(fechas).sort((a,b)=>{
     const [da,ma,ya] = a.split('/').map(Number);
@@ -2071,11 +2256,17 @@ function extraerFecha(fechaHoraStr){
 // Reúne los registros (guardados en el historial + la jornada activa si coincide) de una misma fecha
 function registrosDeLaFecha(fecha){
   const historial = cargarHistorial().filter(r=>extraerFecha(r.fechaHora)===fecha);
-  const actualTieneContenido = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
+  const actualTieneContenido = jornadaTieneContenido();
   if(extraerFecha(estado.fechaHora)===fecha && actualTieneContenido){
     // evita duplicar si la jornada activa ya se guardó en el historial con este mismo _id
     const yaEsta = estado._editandoHistorialId ? historial.some(r=>r._id===estado._editandoHistorialId) : false;
-    if(!yaEsta) historial.push(Object.assign({_esActual:true}, JSON.parse(JSON.stringify(estado))));
+    if(!yaEsta){
+      const clon = JSON.parse(JSON.stringify(estado));
+      const itemsParcelas = (clon.parcelasDelDia||[]).slice();
+      if(parcelaActualTieneContenido()) itemsParcelas.push(construirItemParcelaActual());
+      clon.parcelas = itemsParcelas;
+      historial.push(Object.assign({_esActual:true}, clon));
+    }
   }
   return historial;
 }
@@ -2084,13 +2275,18 @@ function construirHtmlResumenDia(fecha){
   const registros = registrosDeLaFecha(fecha);
   if(registros.length===0) return '<p class="hint" style="margin:6px 0 0;">Aún no hay ninguna parcela guardada para esta fecha.</p>';
 
-  let totalPlantas = 0, totalJornales = 0, totalCostalesGeneral = 0, totalKgGeneral = 0;
+  // aplana todas las parcelas de todos los registros de este día (un registro puede tener varias parcelas)
+  const parcelasDelDia = [];
   registros.forEach(r=>{
-    const avanceR = parseFloat(r.avanceDiarioManual) || 0;
-    totalPlantas += avanceR;
-    totalJornales += parseFloat(r.jornaleros) || 0;
-    totalCostalesGeneral += (r.costales||[]).length;
-    totalKgGeneral += (r.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+    parcelasDe(r).forEach(p=> parcelasDelDia.push(Object.assign({}, p, {_esActual: r._esActual})));
+  });
+
+  let totalPlantas = 0, totalJornales = 0, totalCostalesGeneral = 0, totalKgGeneral = 0;
+  parcelasDelDia.forEach(p=>{
+    totalPlantas += parseFloat(p.avanceDiarioManual) || 0;
+    totalJornales += parseFloat(p.jornaleros) || 0;
+    totalCostalesGeneral += (p.costales||[]).length;
+    totalKgGeneral += (p.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
   });
 
   const promedioGeneral = totalJornales>0 ? (totalPlantas/totalJornales) : 0;
@@ -2099,10 +2295,10 @@ function construirHtmlResumenDia(fecha){
   const colorSem = claseSem==='sem-verde'?'#2E7D46':claseSem==='sem-amarillo'?'#A87B00':claseSem==='sem-rojo'?'#B4432F':'#2F4A3C';
 
   // tarjetas por parcela, con todos sus polígonos reales si tiene KML(s) cargado(s)
-  let html = `<label style="margin:0 0 4px;">Parcelas trabajadas este día (${registros.length})</label>`;
-  html += registros.map(r=>{
-    const nombre = (r.parcela||'Sin parcela') + (r._esActual?' (actual, sin guardar)':'');
-    const kmls = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
+  let html = `<label style="margin:0 0 4px;">Parcelas trabajadas este día (${parcelasDelDia.length})</label>`;
+  html += parcelasDelDia.map(p=>{
+    const nombre = (p.parcela||'Sin parcela') + (p._esActual?' (actual, sin guardar)':'');
+    const kmls = (p.kmls && p.kmls.length) ? p.kmls : [];
     const poligonos = kmls.filter(k=>k && k.puntos && k.puntos.length>=3).map(k=>{
       const visual = k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos, 260, 160);
       const areaTxt = k.areaHa ? `≈ ${k.areaHa.toFixed(2)} ha` : '';
@@ -2110,6 +2306,7 @@ function construirHtmlResumenDia(fecha){
     }).join('');
     return `<div class="parcela-dia-card">
         <div class="parcela-dia-nombre">${nombre}</div>
+        <p class="hint" style="margin:2px 0 4px;">${(parseFloat(p.avanceDiarioManual)||0).toLocaleString('es-MX')} plantas · ${(p.costales||[]).length} costales</p>
         ${poligonos || '<p class="hint" style="margin:4px 0;">Sin polígono KML cargado.</p>'}
       </div>`;
   }).join('');
@@ -2180,10 +2377,16 @@ function guardarUrlSync(v){
 function despojarFotos(obj){
   const copia = JSON.parse(JSON.stringify(obj));
   const limpiar = v => v ? '[foto guardada en el dispositivo]' : v;
-  (copia.costales||[]).forEach(c=>{ c.evidenciaFoto = limpiar(c.evidenciaFoto); });
-  (copia.muestrasTestigo||[]).forEach(m=>{ m.antes = limpiar(m.antes); m.despues = limpiar(m.despues); });
-  (copia.evidenciasGenerales||[]).forEach(ev=>{ ev.dataUrl = limpiar(ev.dataUrl); });
-  (copia.kmls||[]).forEach(k=>{ if(k) k.satelite = limpiar(k.satelite); });
+  const limpiarItemParcela = (p)=>{
+    if(!p) return;
+    (p.costales||[]).forEach(c=>{ c.evidenciaFoto = limpiar(c.evidenciaFoto); });
+    (p.muestrasTestigo||[]).forEach(m=>{ m.antes = limpiar(m.antes); m.despues = limpiar(m.despues); });
+    (p.evidenciasGenerales||[]).forEach(ev=>{ ev.dataUrl = limpiar(ev.dataUrl); });
+    (p.kmls||[]).forEach(k=>{ if(k) k.satelite = limpiar(k.satelite); });
+  };
+  limpiarItemParcela(copia);
+  (copia.parcelas||[]).forEach(limpiarItemParcela);
+  (copia.parcelasDelDia||[]).forEach(limpiarItemParcela);
   if(copia.auditor) copia.auditor.firma = limpiar(copia.auditor.firma);
   return copia;
 }
@@ -2249,21 +2452,24 @@ function sincronizarBajar(){
 function pintarHistorial(){
   const historial = cargarHistorial().slice().reverse(); // más reciente primero
   const filtroVal = document.getElementById('historialFiltroParcela').value;
-  const filtrado = filtroVal ? historial.filter(r=>r.parcela===filtroVal) : historial;
+  const filtrado = filtroVal ? historial.filter(r=>parcelasDe(r).some(p=>p.parcela===filtroVal)) : historial;
   const cont = document.getElementById('historialLista');
   if(filtrado.length===0){
     cont.innerHTML = '<p class="empty">No hay jornadas guardadas en el historial todavía.</p>';
     return;
   }
   cont.innerHTML = filtrado.map(r=>{
+    const items = parcelasDe(r);
     const totalFotos = contarFotosRegistro(r);
+    const totalCostalesR = items.reduce((s,p)=>s+(p.costales||[]).length,0);
+    const nombres = items.map(p=>p.parcela||'Sin parcela').join(', ');
     const etiquetaPrevio = r._avancePrevio ? ' <span class="badge" style="background:var(--ochre);">Avance previo</span>' : '';
     const subInfo = r._avancePrevio
       ? `Avance previo cargado manualmente · ${(parseFloat(r.avanceDiarioManual)||0).toLocaleString('es-MX')} plantas`
-      : `Jefe de Área: ${r.jefeArea||'—'} · Supervisor: ${r.supervisor||'—'} · ${(r.costales||[]).length} costales · ${totalFotos} fotos`;
+      : `Jefe de Área: ${r.jefeArea||'—'} · Supervisor: ${r.supervisor||'—'} · ${items.length>1 ? items.length+' parcelas · ' : ''}${totalCostalesR} costales · ${totalFotos} fotos`;
     return `
       <div class="historial-item">
-        <div class="top"><span>${r.parcela || 'Sin parcela'}${etiquetaPrevio}</span><span>${r.fechaHora || ''}</span></div>
+        <div class="top"><span>${nombres || 'Sin parcela'}${etiquetaPrevio}</span><span>${r.fechaHora || ''}</span></div>
         <div class="sub">${subInfo}</div>
         <div class="row2">
           <button class="btn btn-primary btn-sm" onclick="verDetalleRegistro('${r._id}')" type="button">Ver detalle</button>
@@ -2281,9 +2487,7 @@ function borrarRegistroHistorial(id){
 }
 function contarFotosRegistro(r){
   let n = 0;
-  (r.costales||[]).forEach(c=>{ if(c.evidenciaFoto) n++; });
-  (r.muestrasTestigo||[]).forEach(m=>{ if(m.antes) n++; if(m.despues) n++; });
-  n += (r.evidenciasGenerales||[]).length;
+  parcelasDe(r).forEach(p=> n += contarFotosItemParcela(p));
   return n;
 }
 
@@ -2305,13 +2509,23 @@ function generarPdfDesdeDetalle(){
 }
 function editarRegistroDesdeDetalle(){
   if(!_registroDetalleActual) return;
-  const tieneContenidoActual = (estado.parcela && estado.parcela.trim()!=='') || estado.costales.length>0;
+  const tieneContenidoActual = jornadaTieneContenido();
   if(tieneContenidoActual && estado._editandoHistorialId !== _registroDetalleActual._id){
     const continuar = confirm('Vas a editar este registro guardado. Esto reemplazará el formulario que tienes abierto ahora mismo en pantalla.\n\nSi el formulario actual tiene datos sin guardar, primero ciérralo con "💾 Guardar" y luego vuelve a intentar editar este registro.\n\n¿Deseas continuar de todas formas?');
     if(!continuar) return;
   }
   estado = JSON.parse(JSON.stringify(_registroDetalleActual));
   estado._editandoHistorialId = _registroDetalleActual._id;
+  // Si el registro tiene varias parcelas, todas menos la última pasan a la lista de "parcelas del día"
+  // y la última se carga en los campos de captura, para poder seguir editándola con las mismas herramientas.
+  const items = parcelasDe(estado);
+  if(items.length){
+    estado.parcelasDelDia = items.slice(0, -1);
+    cargarItemParcelaComoActual(items[items.length-1]);
+  }else{
+    estado.parcelasDelDia = [];
+  }
+  delete estado.parcelas; // se reconstruye automáticamente al volver a guardar
   guardar();
   cerrarDetalle();
   cerrarHistorial();
@@ -2337,14 +2551,17 @@ function descargarTodasLasFotos(){
   if(!_registroDetalleActual) return;
   const r = _registroDetalleActual;
   const lista = [];
-  (r.costales||[]).forEach(c=>{
-    if(c.evidenciaFoto) lista.push([c.evidenciaFoto, `costal${c.numero}.jpg`]);
+  parcelasDe(r).forEach((p, pi)=>{
+    const prefijo = parcelasDe(r).length>1 ? `p${pi+1}_` : '';
+    (p.costales||[]).forEach(c=>{
+      if(c.evidenciaFoto) lista.push([c.evidenciaFoto, `${prefijo}costal${c.numero}.jpg`]);
+    });
+    (p.muestrasTestigo||[]).forEach(m=>{
+      if(m.antes) lista.push([m.antes, `${prefijo}muestra${m.numero}_antes.jpg`]);
+      if(m.despues) lista.push([m.despues, `${prefijo}muestra${m.numero}_despues.jpg`]);
+    });
+    (p.evidenciasGenerales||[]).forEach((ev,i)=> lista.push([ev.dataUrl, `${prefijo}evidencia_general_${i+1}.jpg`]));
   });
-  (r.muestrasTestigo||[]).forEach(m=>{
-    if(m.antes) lista.push([m.antes, `muestra${m.numero}_antes.jpg`]);
-    if(m.despues) lista.push([m.despues, `muestra${m.numero}_despues.jpg`]);
-  });
-  (r.evidenciasGenerales||[]).forEach((ev,i)=> lista.push([ev.dataUrl, `evidencia_general_${i+1}.jpg`]));
   if(lista.length===0){ alert('Este registro no tiene fotografías guardadas.'); return; }
   lista.forEach((f,i)=>{
     setTimeout(()=> descargarFoto(f[0], f[1]), i*350);
@@ -2353,85 +2570,104 @@ function descargarTodasLasFotos(){
 
 // vista de solo lectura para el modal de detalle (compacta, con miniaturas)
 function renderDetalleLectura(r){
-  const avance = parseFloat(r.avanceDiarioManual) || 0;
-  const inventario = parseFloat(r.inventarioParcela)||0;
-  const kgTotal = (r.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+  const items = parcelasDe(r);
   let html = '';
 
-  html += `<div class="detalle-section"><h3>Datos generales</h3><table>
+  html += `<div class="detalle-section"><h3>Datos generales de la jornada</h3><table>
     <tr><td><b>Fecha/hora</b></td><td>${r.fechaHora||'—'}</td></tr>
-    <tr><td><b>Parcela</b></td><td>${r.parcela||'—'}</td></tr>
     <tr><td><b>Jefe de Área</b></td><td>${r.jefeArea||'—'}</td></tr>
-    <tr><td><b>Supervisor</b></td><td>${r.supervisor||'—'}</td></tr>
     <tr><td><b>Tipo de fertilizante</b></td><td>${r.tipoFertilizante||'—'}</td></tr>
-    <tr><td><b>Año de plantación</b></td><td>${r.anioPlantacion||'—'}</td></tr>
-    <tr><td><b>Hectáreas</b></td><td>${r.hectareas||'—'}</td></tr>
-    <tr><td><b>Inventario parcela</b></td><td>${inventario ? inventario.toLocaleString('es-MX') : '—'}</td></tr>
-    <tr><td><b>Ubicación</b></td><td>${r.ubicacion ? (r.ubicacion.lat+', '+r.ubicacion.lon) : '—'}</td></tr>
+    <tr><td><b>Parcelas trabajadas</b></td><td>${items.length}</td></tr>
   </table></div>`;
 
-  if(r.dosSupervisores){
-    const dens = parseFloat(r.densidadPlantacion)||0;
-    const h1 = parseFloat(r.hectareasSup1)||0, h2 = parseFloat(r.hectareasSup2)||0;
-    const j1 = parseFloat(r.jornalesSup1)||0, j2 = parseFloat(r.jornalesSup2)||0;
-    html += `<div class="detalle-section"><h3>Dos supervisores en esta parcela</h3><table>
-      <tr><td>Densidad de plantación</td><td class="num">${dens ? dens.toLocaleString('es-MX')+' pl/ha' : '—'}</td></tr>
-      <tr><td>Supervisor 1 (${r.supervisor||'—'})</td><td class="num">${h1} ha · ${j1} jornales · ${Math.round(h1*dens).toLocaleString('es-MX')} plantas</td></tr>
-      <tr><td>Supervisor 2 (${r.supervisor2||'—'})</td><td class="num">${h2} ha · ${j2} jornales · ${Math.round(h2*dens).toLocaleString('es-MX')} plantas</td></tr>
-      <tr><td>Total hectáreas</td><td class="num">${(h1+h2).toLocaleString('es-MX')} ha</td></tr>
+  const resumenAplicadoresReg = calcularResumenPorAplicadorRegistro(r);
+  if(resumenAplicadoresReg.length){
+    html += `<div class="detalle-section"><h3>Costales aplicados por persona (todas las parcelas de esta jornada)</h3><table>
+      <tr><th>Aplicador</th><th>Costales</th><th>Kg</th></tr>
+      ${resumenAplicadoresReg.map(a=>`<tr><td>${a.nombre}</td><td class="num">${a.costales}</td><td class="num">${a.kg.toLocaleString('es-MX')} kg</td></tr>`).join('')}
     </table></div>`;
   }
 
-  html += `<div class="detalle-section"><h3>Costales aplicados (${(r.costales||[]).length}) · ${kgTotal.toLocaleString('es-MX')} kg</h3>`;
-  (r.costales||[]).forEach(c=>{
-    html += `<p style="font-size:13px;margin:6px 0 2px;"><b>Costal #${c.numero}</b> · ${c.hora||''} · Aplicado por: ${c.aplicadoPor||'—'} · ${c.peso} kg</p>`;
-    if(c.evidenciaFoto){
-      html += `<div class="detalle-fotos"><div><img src="${c.evidenciaFoto}"><div class="cap">Evidencia<br><button onclick="descargarFoto('${c.evidenciaFoto}','costal${c.numero}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div></div>`;
-    }
-  });
-  html += `</div>`;
+  items.forEach((p, i)=>{
+    const avance = parseFloat(p.avanceDiarioManual) || 0;
+    const inventario = parseFloat(p.inventarioParcela)||0;
+    const kgTotal = (p.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
 
-  if((r.muestrasTestigo||[]).length){
-    html += `<div class="detalle-section"><h3>Muestras testigo (antes/después)</h3>`;
-    r.muestrasTestigo.forEach(m=>{
-      const fotos = [];
-      if(m.antes) fotos.push([m.antes, 'Antes']);
-      if(m.despues) fotos.push([m.despues, 'Después']);
-      html += `<p style="font-size:13px;margin:6px 0 2px;"><b>Muestra #${m.numero}</b></p>`;
-      if(fotos.length){
-        html += `<div class="detalle-fotos">` + fotos.map((f,i)=>`<div><img src="${f[0]}"><div class="cap">${f[1]}<br><button onclick="descargarFoto('${f[0]}','muestra${m.numero}_${f[1].toLowerCase()}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div>`).join('') + `</div>`;
+    html += `<div class="detalle-section" style="border-top:2px solid var(--ochre);padding-top:10px;margin-top:16px;"><h3>Parcela ${i+1} de ${items.length}: ${p.parcela||'—'}</h3><table>
+      <tr><td><b>Supervisor</b></td><td>${p.supervisor||'—'}</td></tr>
+      <tr><td><b>Año de plantación</b></td><td>${p.anioPlantacion||'—'}</td></tr>
+      <tr><td><b>Hectáreas</b></td><td>${p.hectareas||'—'}</td></tr>
+      <tr><td><b>Inventario parcela</b></td><td>${inventario ? inventario.toLocaleString('es-MX') : '—'}</td></tr>
+      <tr><td><b>Ubicación</b></td><td>${p.ubicacion ? (p.ubicacion.lat+', '+p.ubicacion.lon) : '—'}</td></tr>
+    </table></div>`;
+
+    if(p.dosSupervisores){
+      const dens = parseFloat(p.densidadPlantacion)||0;
+      const h1 = parseFloat(p.hectareasSup1)||0, h2 = parseFloat(p.hectareasSup2)||0;
+      const j1 = parseFloat(p.jornalesSup1)||0, j2 = parseFloat(p.jornalesSup2)||0;
+      html += `<div class="detalle-section"><h3>Dos supervisores en esta parcela</h3><table>
+        <tr><td>Densidad de plantación</td><td class="num">${dens ? dens.toLocaleString('es-MX')+' pl/ha' : '—'}</td></tr>
+        <tr><td>Supervisor 1 (${p.supervisor||'—'})</td><td class="num">${h1} ha · ${j1} jornales · ${Math.round(h1*dens).toLocaleString('es-MX')} plantas</td></tr>
+        <tr><td>Supervisor 2 (${p.supervisor2||'—'})</td><td class="num">${h2} ha · ${j2} jornales · ${Math.round(h2*dens).toLocaleString('es-MX')} plantas</td></tr>
+        <tr><td>Total hectáreas</td><td class="num">${(h1+h2).toLocaleString('es-MX')} ha</td></tr>
+      </table></div>`;
+    }
+
+    html += `<div class="detalle-section"><h3>Costales aplicados (${(p.costales||[]).length}) · ${kgTotal.toLocaleString('es-MX')} kg</h3>`;
+    (p.costales||[]).forEach(c=>{
+      html += `<p style="font-size:13px;margin:6px 0 2px;"><b>Costal #${c.numero}</b> · ${c.hora||''} · Aplicado por: ${c.aplicadoPor||'—'} · ${c.peso} kg</p>`;
+      if(c.evidenciaFoto){
+        html += `<div class="detalle-fotos"><div><img src="${c.evidenciaFoto}"><div class="cap">Evidencia<br><button onclick="descargarFoto('${c.evidenciaFoto}','costal${c.numero}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div></div>`;
       }
     });
     html += `</div>`;
-  }
 
-  const {acumulado} = (typeof calcularAvanceAcumuladoParcela==='function' && r._esActual) ? calcularAvanceAcumuladoParcela() : {acumulado: avance};
-  const faltanteAcum = Math.max(inventario - acumulado, 0);
-  const pctReg = inventario>0 ? Math.round((acumulado/inventario)*100) : null;
-  const semReg = pctReg!==null ? semaforoAvance(pctReg) : null;
-  const jornalesNum = parseFloat(r.jornaleros) || 0;
-  const promedioReg = jornalesNum>0 ? Math.round(avance/jornalesNum) : null;
-  const emojiRend = promedioReg!==null ? (semaforoRendimiento(promedioReg)==='sem-verde' ? '🟢' : '🔴') : '';
-  html += `<div class="detalle-section"><h3>Avance y jornales</h3><table>
-    <tr><td>Avance en plantas (este día)</td><td class="num">${avance.toLocaleString('es-MX')}</td></tr>
-    <tr><td>Avance acumulado de la parcela</td><td class="num">${acumulado.toLocaleString('es-MX')}</td></tr>
-    <tr><td>% de avance acumulado</td><td class="num">${pctReg!==null ? semReg.emoji+' '+pctReg+'%' : '—'}</td></tr>
-    <tr><td>Faltante por aplicar</td><td class="num">${inventario ? faltanteAcum.toLocaleString('es-MX') : '—'}</td></tr>
-    <tr><td>Jornales requeridos</td><td class="num">${r.jornaleros||'—'}</td></tr>
-    <tr><td>Plantas por jornal</td><td class="num">${promedioReg!==null ? emojiRend+' '+promedioReg.toLocaleString('es-MX') : '—'}</td></tr>
-  </table></div>`;
+    if((p.muestrasTestigo||[]).length){
+      html += `<div class="detalle-section"><h3>Muestras testigo (antes/después)</h3>`;
+      p.muestrasTestigo.forEach(m=>{
+        const fotos = [];
+        if(m.antes) fotos.push([m.antes, 'Antes']);
+        if(m.despues) fotos.push([m.despues, 'Después']);
+        html += `<p style="font-size:13px;margin:6px 0 2px;"><b>Muestra #${m.numero}</b></p>`;
+        if(fotos.length){
+          html += `<div class="detalle-fotos">` + fotos.map((f,i)=>`<div><img src="${f[0]}"><div class="cap">${f[1]}<br><button onclick="descargarFoto('${f[0]}','muestra${m.numero}_${f[1].toLowerCase()}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div>`).join('') + `</div>`;
+        }
+      });
+      html += `</div>`;
+    }
 
-  if((r.evidenciasGenerales||[]).length){
-    html += `<div class="detalle-section"><h3>Evidencias generales</h3><div class="detalle-fotos">` +
-      r.evidenciasGenerales.map((ev,i)=>`<div><img src="${ev.dataUrl}"><div class="cap">Evidencia #${i+1}<br><button onclick="descargarFoto('${ev.dataUrl}','evidencia_general_${i+1}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div>`).join('') + `</div></div>`;
-  }
+    let acumulado = avance;
+    if(r._esActual && p.parcela===estado.parcela){
+      acumulado = calcularAvanceAcumuladoParcela().acumulado;
+    }
+    const inventarioNum = inventario;
+    const faltanteAcum = Math.max(inventarioNum - acumulado, 0);
+    const pctReg = inventarioNum>0 ? Math.round((acumulado/inventarioNum)*100) : null;
+    const semReg = pctReg!==null ? semaforoAvance(pctReg) : null;
+    const jornalesNum = parseFloat(p.jornaleros) || 0;
+    const promedioReg = jornalesNum>0 ? Math.round(avance/jornalesNum) : null;
+    const emojiRend = promedioReg!==null ? (semaforoRendimiento(promedioReg)==='sem-verde' ? '🟢' : '🔴') : '';
+    html += `<div class="detalle-section"><h3>Avance y jornales</h3><table>
+      <tr><td>Avance en plantas (este día)</td><td class="num">${avance.toLocaleString('es-MX')}</td></tr>
+      <tr><td>Avance acumulado de la parcela</td><td class="num">${acumulado.toLocaleString('es-MX')}</td></tr>
+      <tr><td>% de avance acumulado</td><td class="num">${pctReg!==null ? semReg.emoji+' '+pctReg+'%' : '—'}</td></tr>
+      <tr><td>Faltante por aplicar</td><td class="num">${inventarioNum ? faltanteAcum.toLocaleString('es-MX') : '—'}</td></tr>
+      <tr><td>Jornales requeridos</td><td class="num">${p.jornaleros||'—'}</td></tr>
+      <tr><td>Plantas por jornal</td><td class="num">${promedioReg!==null ? emojiRend+' '+promedioReg.toLocaleString('es-MX') : '—'}</td></tr>
+    </table></div>`;
 
-  const kmlsReg = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
-  if(kmlsReg.length){
-    html += `<div class="detalle-section"><h3>Polígonos KML (${kmlsReg.length})</h3>` +
-      kmlsReg.map(k=>`<p style="font-size:13px;margin:6px 0 2px;">${k.placemark||k.archivo}${k.areaHa? ' · ≈'+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('') +
-      `</div>`;
-  }
+    if((p.evidenciasGenerales||[]).length){
+      html += `<div class="detalle-section"><h3>Evidencias generales</h3><div class="detalle-fotos">` +
+        p.evidenciasGenerales.map((ev,i)=>`<div><img src="${ev.dataUrl}"><div class="cap">Evidencia #${i+1}<br><button onclick="descargarFoto('${ev.dataUrl}','evidencia_general_${i+1}.jpg')" type="button" style="border:none;background:none;color:var(--agave-dark);cursor:pointer;">⬇️ Descargar</button></div></div>`).join('') + `</div></div>`;
+    }
+
+    const kmlsReg = (p.kmls && p.kmls.length) ? p.kmls : [];
+    if(kmlsReg.length){
+      html += `<div class="detalle-section"><h3>Polígonos KML (${kmlsReg.length})</h3>` +
+        kmlsReg.map(k=>`<p style="font-size:13px;margin:6px 0 2px;">${k.placemark||k.archivo}${k.areaHa? ' · ≈'+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('') +
+        `</div>`;
+    }
+  });
 
   html += `<div class="detalle-section"><h3>Observaciones</h3><p style="font-size:13px;">${r.observaciones||'—'}</p></div>`;
 
@@ -2443,54 +2679,122 @@ function renderDetalleLectura(r){
 
 /* ---------------- Generación de PDF (documento imprimible independiente) ---------------- */
 function generarPdfRegistro(r){
-  const avance = parseFloat(r.avanceDiarioManual) || 0;
-  const inventario = parseFloat(r.inventarioParcela)||0;
-  const kgTotal = (r.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
-
-  // avance acumulado de la parcela (todas las jornadas guardadas, sin duplicar este mismo registro)
-  const historialParcela = cargarHistorial().filter(h=> h.parcela === r.parcela && h._id !== r._id);
-  const acumulado = historialParcela.reduce((s,h)=> s + (parseFloat(h.avanceDiarioManual)||0), 0) + avance;
-  const faltante = Math.max(inventario-acumulado, 0);
-
-  const pctPdf = inventario>0 ? Math.round((acumulado/inventario)*100) : null;
-  const semPdf = pctPdf!==null ? semaforoAvance(pctPdf) : null;
-  const colorSem = semPdf ? (semPdf.clase==='sem-verde'?'#2E7D46':semPdf.clase==='sem-amarillo'?'#D9A404':'#B4432F') : '#2F4A3C';
-  const jornalesPdf = parseFloat(r.jornaleros) || 0;
-  const promedioPdf = jornalesPdf>0 ? Math.round(avance/jornalesPdf) : null;
-  const claseRendPdf = promedioPdf!==null ? semaforoRendimiento(promedioPdf) : '';
-  const colorRendPdf = claseRendPdf==='sem-verde'?'#2E7D46':claseRendPdf==='sem-rojo'?'#B4432F':'#2F4A3C';
-  const emojiRendPdf = claseRendPdf==='sem-verde'?'🟢':claseRendPdf==='sem-rojo'?'🔴':'';
-
-  let filas = '';
-  (r.costales||[]).forEach(c=>{
-    filas += `<tr>
-      <td>${c.numero}</td>
-      <td>${(c.hora||'').split(' ')[1]||c.hora||''}</td>
-      <td>${c.aplicadoPor||'—'}</td>
-      <td>${c.peso} kg</td>
-    </tr>`;
+  const items = parcelasDe(r);
+  let totalPlantas=0, totalJornales=0, totalCostales=0, kgTotalGeneral=0;
+  items.forEach(p=>{
+    totalPlantas += parseFloat(p.avanceDiarioManual)||0;
+    totalJornales += parseFloat(p.jornaleros)||0;
+    totalCostales += (p.costales||[]).length;
+    kgTotalGeneral += (p.costales||[]).reduce((s,c)=>s+(parseFloat(c.peso)||0),0);
   });
+  const promedioGeneralPdf = totalJornales>0 ? Math.round(totalPlantas/totalJornales) : null;
+  const claseRendGenPdf = promedioGeneralPdf!==null ? semaforoRendimiento(promedioGeneralPdf) : '';
+  const colorRendGenPdf = claseRendGenPdf==='sem-verde'?'#2E7D46':claseRendGenPdf==='sem-rojo'?'#B4432F':'#2F4A3C';
+  const emojiRendGenPdf = claseRendGenPdf==='sem-verde'?'🟢':claseRendGenPdf==='sem-rojo'?'🔴':'';
+  const resumenAplicadoresPdf = calcularResumenPorAplicadorRegistro(r);
 
-  let fotosHtml = '';
-  (r.costales||[]).forEach(c=>{
-    if(c.evidenciaFoto){
-      fotosHtml += `<div class="foto-pdf"><img src="${c.evidenciaFoto}"><div class="cap">Costal #${c.numero}</div></div>`;
-    }
-  });
-  (r.muestrasTestigo||[]).forEach(m=>{
-    if(m.antes) fotosHtml += `<div class="foto-pdf"><img src="${m.antes}"><div class="cap">Muestra #${m.numero} · Antes</div></div>`;
-    if(m.despues) fotosHtml += `<div class="foto-pdf"><img src="${m.despues}"><div class="cap">Muestra #${m.numero} · Después</div></div>`;
-  });
-  (r.evidenciasGenerales||[]).forEach((ev,i)=>{
-    fotosHtml += `<div class="foto-pdf"><img src="${ev.dataUrl}"><div class="cap">Evidencia general #${i+1}</div></div>`;
-  });
+  const seccionesParcelas = items.map((p,i)=>{
+    const avance = parseFloat(p.avanceDiarioManual) || 0;
+    const inventario = parseFloat(p.inventarioParcela)||0;
+    const kgTotal = (p.costales||[]).reduce((s,c)=> s + (parseFloat(c.peso)||0), 0);
+
+    // avance acumulado de ESTA parcela (todas las jornadas guardadas de la misma parcela, sin duplicar este registro)
+    const historialParcela = cargarHistorial().filter(h=> h._id !== r._id);
+    let acumuladoAnterior = 0;
+    historialParcela.forEach(h=> parcelasDe(h).forEach(pp=>{ if(pp.parcela===p.parcela) acumuladoAnterior += (parseFloat(pp.avanceDiarioManual)||0); }));
+    const acumulado = acumuladoAnterior + avance;
+    const faltante = Math.max(inventario-acumulado, 0);
+
+    const pctPdf = inventario>0 ? Math.round((acumulado/inventario)*100) : null;
+    const semPdf = pctPdf!==null ? semaforoAvance(pctPdf) : null;
+    const colorSem = semPdf ? (semPdf.clase==='sem-verde'?'#2E7D46':semPdf.clase==='sem-amarillo'?'#D9A404':'#B4432F') : '#2F4A3C';
+    const jornalesPdf = parseFloat(p.jornaleros) || 0;
+    const promedioPdf = jornalesPdf>0 ? Math.round(avance/jornalesPdf) : null;
+    const claseRendPdf = promedioPdf!==null ? semaforoRendimiento(promedioPdf) : '';
+    const colorRendPdf = claseRendPdf==='sem-verde'?'#2E7D46':claseRendPdf==='sem-rojo'?'#B4432F':'#2F4A3C';
+    const emojiRendPdf = claseRendPdf==='sem-verde'?'🟢':claseRendPdf==='sem-rojo'?'🔴':'';
+
+    let filas = '';
+    (p.costales||[]).forEach(c=>{
+      filas += `<tr>
+        <td>${c.numero}</td>
+        <td>${(c.hora||'').split(' ')[1]||c.hora||''}</td>
+        <td>${c.aplicadoPor||'—'}</td>
+        <td>${c.peso} kg</td>
+      </tr>`;
+    });
+
+    let fotosHtml = '';
+    (p.costales||[]).forEach(c=>{
+      if(c.evidenciaFoto){ fotosHtml += `<div class="foto-pdf"><img src="${c.evidenciaFoto}"><div class="cap">Costal #${c.numero}</div></div>`; }
+    });
+    (p.muestrasTestigo||[]).forEach(m=>{
+      if(m.antes) fotosHtml += `<div class="foto-pdf"><img src="${m.antes}"><div class="cap">Muestra #${m.numero} · Antes</div></div>`;
+      if(m.despues) fotosHtml += `<div class="foto-pdf"><img src="${m.despues}"><div class="cap">Muestra #${m.numero} · Después</div></div>`;
+    });
+    (p.evidenciasGenerales||[]).forEach((ev,i)=>{
+      fotosHtml += `<div class="foto-pdf"><img src="${ev.dataUrl}"><div class="cap">Evidencia general #${i+1}</div></div>`;
+    });
+
+    const kmlsPdf = (p.kmls && p.kmls.length) ? p.kmls : [];
+
+    const bloqueDosSup = !p.dosSupervisores ? '' : (()=>{
+      const dens = parseFloat(p.densidadPlantacion)||0;
+      const h1 = parseFloat(p.hectareasSup1)||0, h2 = parseFloat(p.hectareasSup2)||0;
+      const j1 = parseFloat(p.jornalesSup1)||0, j2 = parseFloat(p.jornalesSup2)||0;
+      return `<table>
+        <tr><th>Supervisor</th><th>Hectáreas</th><th>Jornales</th><th>Plantas (ha × densidad)</th></tr>
+        <tr><td>${p.supervisor||'—'} (Sup. 1)</td><td>${h1}</td><td>${j1}</td><td>${Math.round(h1*dens).toLocaleString('es-MX')}</td></tr>
+        <tr><td>${p.supervisor2||'—'} (Sup. 2)</td><td>${h2}</td><td>${j2}</td><td>${Math.round(h2*dens).toLocaleString('es-MX')}</td></tr>
+      </table>
+      <p>Densidad de plantación: ${dens.toLocaleString('es-MX')} plantas/ha · Total hectáreas: ${(h1+h2).toLocaleString('es-MX')} ha</p>`;
+    })();
+
+    const bloqueKml = !kmlsPdf.length ? '' :
+      `<h3 style="font-size:12px;margin:10px 0 4px;">Polígonos de trabajo (${kmlsPdf.length})</h3>` +
+      kmlsPdf.map(k=>`<p>${k.placemark||k.archivo}${k.areaHa? ' · área aproximada '+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('');
+
+    return `
+    <h2 style="background:#F3F1E7;">Parcela ${i+1} de ${items.length}: ${p.parcela||'—'}</h2>
+    <table class="datos">
+      <tr><td>Supervisor</td><td>${p.supervisor||'—'}</td></tr>
+      <tr><td>Año de plantación</td><td>${p.anioPlantacion||'—'}</td></tr>
+      <tr><td>Hectáreas</td><td>${p.hectareas||'—'}</td></tr>
+      <tr><td>Inventario de la parcela</td><td>${inventario?inventario.toLocaleString('es-MX'):'—'}</td></tr>
+      <tr><td>Ubicación GPS</td><td>${p.ubicacion?(p.ubicacion.lat+', '+p.ubicacion.lon+' (±'+p.ubicacion.precision+'m)'):'—'}</td></tr>
+    </table>
+    ${bloqueDosSup}
+    <div class="stats">
+      <div class="stat"><b>${(p.costales||[]).length}</b>Costales aplicados</div>
+      <div class="stat"><b>${kgTotal.toLocaleString('es-MX')} kg</b>Fertilizante consumido</div>
+      <div class="stat"><b>${avance.toLocaleString('es-MX')}</b>Plantas fertilizadas (hoy)</div>
+      <div class="stat"><b>${acumulado.toLocaleString('es-MX')}</b>Avance acumulado (parcela)</div>
+      <div class="stat" style="border-color:${colorSem};"><b style="color:${colorSem};">${pctPdf!==null ? semPdf.emoji+' '+pctPdf+'%' : '—'}</b>% acumulado de la parcela</div>
+      <div class="stat"><b>${inventario?faltante.toLocaleString('es-MX'):'—'}</b>Faltante por aplicar</div>
+      <div class="stat"><b>${p.jornaleros||'—'}</b>Jornales requeridos</div>
+      <div class="stat" style="border-color:${colorRendPdf};"><b style="color:${colorRendPdf};">${promedioPdf!==null ? emojiRendPdf+' '+promedioPdf.toLocaleString('es-MX') : '—'}</b>Plantas por jornal (estándar 1,500)</div>
+    </div>
+
+    <h3 style="font-size:12px;margin:10px 0 4px;">Detalle de costales aplicados</h3>
+    <table>
+      <tr><th>#</th><th>Hora</th><th>Aplicado por</th><th>Peso</th></tr>
+      ${filas || '<tr><td colspan="4">Sin costales registrados</td></tr>'}
+    </table>
+
+    <h3 style="font-size:12px;margin:10px 0 4px;">Evidencias fotográficas</h3>
+    <div class="fotos">${fotosHtml || '<p>Sin fotografías registradas.</p>'}</div>
+
+    ${bloqueKml}
+    `;
+  }).join('<hr style="margin:18px 0;border:none;border-top:2px dashed #ccc;">');
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-  <title>Reporte de fertilizante - ${r.parcela||''} - ${r.fechaHora||''}</title>
+  <title>Reporte de fertilizante - ${r.fechaHora||''}</title>
   <style>
     body{font-family:Arial,Helvetica,sans-serif;color:#1E2A22;margin:24px;font-size:13px;}
     h1{font-size:18px;margin:0 0 2px;color:#2F4A3C;}
-    h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#2F4A3C;border-bottom:1px solid #ccc;padding-bottom:3px;margin:18px 0 8px;}
+    h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#2F4A3C;border-bottom:1px solid #ccc;padding:6px 8px;margin:18px 0 8px;}
+    h3{color:#2F4A3C;}
     table{width:100%;border-collapse:collapse;margin-bottom:6px;}
     td,th{border:1px solid #ddd;padding:5px 6px;text-align:left;vertical-align:top;}
     .datos td:first-child{font-weight:bold;width:32%;background:#F3F1E7;}
@@ -2507,68 +2811,32 @@ function generarPdfRegistro(r){
     @media print{ body{margin:10mm;} }
   </style></head><body>
     <h1>Consolidación de Agave — Reporte de aplicación de fertilizante granulado</h1>
-    <div>${r.fechaHora||''} · Parcela: ${r.parcela||'—'} · Fertilizante: ${r.tipoFertilizante||'—'}</div>
+    <div>${r.fechaHora||''} · ${items.length} parcela(s) trabajada(s) · Fertilizante: ${r.tipoFertilizante||'—'}</div>
 
-    <h2>Datos generales</h2>
+    <h2>Datos generales de la jornada</h2>
     <table class="datos">
       <tr><td>Jefe de Área</td><td>${r.jefeArea||'—'}</td></tr>
-      <tr><td>Supervisor</td><td>${r.supervisor||'—'}</td></tr>
       <tr><td>Tipo de fertilizante</td><td>${r.tipoFertilizante||'—'}</td></tr>
-      <tr><td>Año de plantación</td><td>${r.anioPlantacion||'—'}</td></tr>
-      <tr><td>Hectáreas</td><td>${r.hectareas||'—'}</td></tr>
-      <tr><td>Inventario de la parcela</td><td>${inventario?inventario.toLocaleString('es-MX'):'—'}</td></tr>
-      <tr><td>Ubicación GPS</td><td>${r.ubicacion?(r.ubicacion.lat+', '+r.ubicacion.lon+' (±'+r.ubicacion.precision+'m)'):'—'}</td></tr>
     </table>
 
-    ${(()=>{
-      if(!r.dosSupervisores) return '';
-      const dens = parseFloat(r.densidadPlantacion)||0;
-      const h1 = parseFloat(r.hectareasSup1)||0, h2 = parseFloat(r.hectareasSup2)||0;
-      const j1 = parseFloat(r.jornalesSup1)||0, j2 = parseFloat(r.jornalesSup2)||0;
-      return `<h2>Dos supervisores en esta parcela</h2>
-      <table>
-        <tr><th>Supervisor</th><th>Hectáreas</th><th>Jornales</th><th>Plantas (ha × densidad)</th></tr>
-        <tr><td>${r.supervisor||'—'} (Sup. 1)</td><td>${h1}</td><td>${j1}</td><td>${Math.round(h1*dens).toLocaleString('es-MX')}</td></tr>
-        <tr><td>${r.supervisor2||'—'} (Sup. 2)</td><td>${h2}</td><td>${j2}</td><td>${Math.round(h2*dens).toLocaleString('es-MX')}</td></tr>
-      </table>
-      <p>Densidad de plantación: ${dens.toLocaleString('es-MX')} plantas/ha · Total hectáreas: ${(h1+h2).toLocaleString('es-MX')} ha</p>`;
-    })()}
-
-    <h2>Resumen de la jornada</h2>
+    <h2>Resumen total del día (todas las parcelas)</h2>
     <div class="stats">
-      <div class="stat"><b>${(r.costales||[]).length}</b>Costales aplicados</div>
-      <div class="stat"><b>${kgTotal.toLocaleString('es-MX')} kg</b>Fertilizante consumido</div>
-      <div class="stat"><b>${avance.toLocaleString('es-MX')}</b>Plantas fertilizadas (hoy)</div>
-      <div class="stat"><b>${acumulado.toLocaleString('es-MX')}</b>Avance acumulado (parcela)</div>
-      <div class="stat" style="border-color:${colorSem};"><b style="color:${colorSem};">${pctPdf!==null ? semPdf.emoji+' '+pctPdf+'%' : '—'}</b>% acumulado de la parcela</div>
-      <div class="stat"><b>${inventario?faltante.toLocaleString('es-MX'):'—'}</b>Faltante por aplicar</div>
-      <div class="stat"><b>${r.jornaleros||'—'}</b>Jornales requeridos</div>
-      <div class="stat" style="border-color:${colorRendPdf};"><b style="color:${colorRendPdf};">${promedioPdf!==null ? emojiRendPdf+' '+promedioPdf.toLocaleString('es-MX') : '—'}</b>Plantas por jornal (estándar 1,500)</div>
+      <div class="stat"><b>${items.length}</b>Parcelas trabajadas</div>
+      <div class="stat"><b>${totalCostales}</b>Costales aplicados</div>
+      <div class="stat"><b>${kgTotalGeneral.toLocaleString('es-MX')} kg</b>Fertilizante consumido</div>
+      <div class="stat"><b>${totalPlantas.toLocaleString('es-MX')}</b>Plantas fertilizadas hoy</div>
+      <div class="stat"><b>${totalJornales.toLocaleString('es-MX')}</b>Jornales totales</div>
+      <div class="stat" style="border-color:${colorRendGenPdf};"><b style="color:${colorRendGenPdf};">${promedioGeneralPdf!==null ? emojiRendGenPdf+' '+promedioGeneralPdf.toLocaleString('es-MX') : '—'}</b>Plantas por jornal (general)</div>
     </div>
 
-    <h2>Detalle de costales aplicados</h2>
+    ${!resumenAplicadoresPdf.length ? '' : `
+    <h3 style="font-size:12px;margin:10px 0 4px;">Costales aplicados por persona (todas las parcelas de hoy)</h3>
     <table>
-      <tr><th>#</th><th>Hora</th><th>Aplicado por</th><th>Peso</th></tr>
-      ${filas || '<tr><td colspan="4">Sin costales registrados</td></tr>'}
-    </table>
+      <tr><th>Aplicador</th><th>Costales</th><th>Kg</th></tr>
+      ${resumenAplicadoresPdf.map(a=>`<tr><td>${a.nombre}</td><td>${a.costales}</td><td>${a.kg.toLocaleString('es-MX')} kg</td></tr>`).join('')}
+    </table>`}
 
-    ${(()=>{
-      const adicionales = r.parcelasAdicionales || [];
-      if(!adicionales.length) return '';
-      return '<h2>Otras parcelas de esta misma jornada</h2><table><tr><th>Parcela</th><th>Avance (plantas)</th><th>Jornales</th><th>Costales</th><th>Kg</th></tr>' +
-        adicionales.map(b=>`<tr><td>${b.parcela||'—'}</td><td>${b.avanceDiarioManual||0}</td><td>${b.jornaleros||0}</td><td>${(b.costales||[]).length}</td><td>${(b.costales||[]).reduce((s,c)=>s+(parseFloat(c.peso)||0),0)}</td></tr>`).join('') +
-        '</table><p>Cada una de estas parcelas queda guardada como su propio registro en el historial, con su propio PDF disponible ahí.</p>';
-    })()}
-
-    <h2>Evidencias fotográficas</h2>
-    <div class="fotos">${fotosHtml || '<p>Sin fotografías registradas.</p>'}</div>
-
-    ${(()=>{
-      const kmlsPdf = (r.kmls && r.kmls.length) ? r.kmls : (r.kml ? [r.kml] : []);
-      if(!kmlsPdf.length) return '';
-      return `<h2>Polígonos de trabajo (${kmlsPdf.length})</h2>` +
-        kmlsPdf.map(k=>`<p>${k.placemark||k.archivo}${k.areaHa? ' · área aproximada '+k.areaHa.toFixed(2)+' ha':''}</p>${k.satelite ? construirVistaSatelital(k) : construirSvgPoligono(k.puntos)}`).join('');
-    })()}
+    ${seccionesParcelas}
 
     <h2>Observaciones</h2>
     <p>${(r.observaciones||'—').replace(/\n/g,'<br>')}</p>
@@ -2589,6 +2857,16 @@ function generarPdfRegistro(r){
   win.document.write(html);
   win.document.close();
   setTimeout(()=>{ win.focus(); win.print(); }, 400);
+}
+// Genera el PDF de la jornada que está abierta en pantalla ahora mismo (incluye la parcela en
+// captura + todas las ya agregadas en la sección 6, aunque todavía no se haya tocado "Guardar")
+function generarPdfDesdeFormulario(){
+  const clon = JSON.parse(JSON.stringify(estado));
+  const itemsParcelas = (clon.parcelasDelDia||[]).slice();
+  if(parcelaActualTieneContenido()) itemsParcelas.push(construirItemParcelaActual());
+  clon.parcelas = itemsParcelas;
+  clon._id = clon._editandoHistorialId || ('temp_'+Date.now());
+  generarPdfRegistro(clon);
 }
 
 /* ---------------- Evidencias generales ---------------- */
@@ -2792,277 +3070,6 @@ function construirSvgPoligono(puntos, w, h){
     <polygon points="${pts}" fill="#7C9885" fill-opacity="0.45" stroke="#2F4A3C" stroke-width="2.2" stroke-linejoin="round"/>
     <text x="${w-10}" y="18" font-size="12" font-weight="700" text-anchor="end" fill="#2F4A3C">N ↑</text>
   </svg>`;
-}
-
-/* ---------------- Otras parcelas trabajadas hoy (misma jornada) ---------------- */
-function agregarParcelaAdicional(){
-  estado.parcelasAdicionales.push({
-    id: 'bloque_' + Date.now() + '_' + Math.floor(Math.random()*10000),
-    parcela: '', parcelaIdx: '', hectareas: '', anioPlantacion: '', inventarioParcela: '',
-    pesoCostalDefault: estado.pesoCostalDefault || 50,
-    costales: [], evidenciasGenerales: [], kmls: [],
-    avanceDiarioManual: '', jornaleros: '',
-    _historialLinkId: null
-  });
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-function quitarParcelaAdicional(idx){
-  if(!confirm('¿Quitar esta parcela de la jornada de hoy? Si ya la habías guardado, el registro que quedó en el historial NO se borra (solo se quita de este formulario).')) return;
-  estado.parcelasAdicionales.splice(idx,1);
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-function bloqueCambio(idx, campo, valor){
-  estado.parcelasAdicionales[idx][campo] = valor;
-  actualizarResumen();
-  guardar();
-}
-function onParcelaBloqueChange(idx, v){
-  const bloque = estado.parcelasAdicionales[idx];
-  const manualInput = document.getElementById('parcelaBloqueManual_'+idx);
-  if(v === 'otra'){
-    if(manualInput) manualInput.style.display = 'block';
-    bloque.parcela = manualInput ? manualInput.value : '';
-    bloque.parcelaIdx = ''; bloque.hectareas = ''; bloque.anioPlantacion = '';
-  }else if(v === ''){
-    if(manualInput) manualInput.style.display = 'none';
-    bloque.parcela = ''; bloque.parcelaIdx = ''; bloque.hectareas = ''; bloque.anioPlantacion = '';
-  }else{
-    if(manualInput) manualInput.style.display = 'none';
-    const item = INVENTARIO[parseInt(v)];
-    bloque.parcelaIdx = v;
-    bloque.parcela = item.rancho + ' · ' + item.contrato;
-    bloque.hectareas = item.has;
-    bloque.anioPlantacion = item.anio;
-    bloque.inventarioParcela = item.inventario;
-  }
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-function parcelaBloqueManualCambio(idx, valor){
-  estado.parcelasAdicionales[idx].parcela = valor;
-  guardar();
-}
-
-// --- Costales dentro de un bloque de parcela adicional ---
-function abrirNuevoCostalBloque(idx){
-  const bloque = estado.parcelasAdicionales[idx];
-  if(!bloque.parcela){ alert('Primero selecciona la parcela de este bloque.'); return; }
-  let maxNum = 0;
-  bloque.costales.forEach(c=>{ if((c.numero||0)>maxNum) maxNum=c.numero; });
-  const historial = cargarHistorial().filter(r=> r.parcela === bloque.parcela && r._id !== bloque._historialLinkId);
-  historial.forEach(r=>{ (r.costales||[]).forEach(c=>{ if((c.numero||0)>maxNum) maxNum=c.numero; }); });
-  const ultimoAplicador = (()=>{ try{ return localStorage.getItem('fert_ultimo_aplicador') || ''; }catch(e){ return ''; } })();
-  bloque.costales.push({
-    numero: maxNum+1,
-    hora: fmtFechaHora(new Date()),
-    peso: bloque.pesoCostalDefault || 50,
-    aplicadoPor: ultimoAplicador,
-    evidenciaFoto: null
-  });
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-function quitarCostalBloque(idxBloque, idxCostal){
-  estado.parcelasAdicionales[idxBloque].costales.splice(idxCostal,1);
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-function costalBloqueCambioPeso(idxBloque, idxCostal, valor){
-  let n = parseFloat(valor); if(isNaN(n)||n<0) n = 0;
-  estado.parcelasAdicionales[idxBloque].costales[idxCostal].peso = n;
-  actualizarResumen();
-  guardar();
-}
-function costalBloqueCambioAplicadoPor(idxBloque, idxCostal, valor){
-  estado.parcelasAdicionales[idxBloque].costales[idxCostal].aplicadoPor = valor;
-  try{ localStorage.setItem('fert_ultimo_aplicador', valor); }catch(e){}
-  guardar();
-}
-function onFotoCostalBloque(idxBloque, idxCostal, inputEl){
-  const file = inputEl.files && inputEl.files[0];
-  if(!file) return;
-  compressImage(file, dataUrl=>{
-    estado.parcelasAdicionales[idxBloque].costales[idxCostal].evidenciaFoto = dataUrl;
-    pintarParcelasAdicionales();
-    actualizarResumen();
-    guardar();
-  });
-  inputEl.value = '';
-}
-function quitarFotoCostalBloque(idxBloque, idxCostal){
-  estado.parcelasAdicionales[idxBloque].costales[idxCostal].evidenciaFoto = null;
-  pintarParcelasAdicionales();
-  guardar();
-}
-
-// --- Evidencias generales dentro de un bloque ---
-function onFotoGeneralBloque(idx, inputEl){
-  const file = inputEl.files && inputEl.files[0];
-  if(!file) return;
-  compressImage(file, dataUrl=>{
-    estado.parcelasAdicionales[idx].evidenciasGenerales.push({dataUrl, hora: fmtFechaHora(new Date())});
-    pintarParcelasAdicionales();
-    actualizarResumen();
-    guardar();
-  });
-  inputEl.value = '';
-}
-function quitarFotoGeneralBloque(idxBloque, i){
-  estado.parcelasAdicionales[idxBloque].evidenciasGenerales.splice(i,1);
-  pintarParcelasAdicionales();
-  actualizarResumen();
-  guardar();
-}
-
-// --- KML dentro de un bloque ---
-function onKmlInputBloque(idxBloque, inputEl){
-  const files = inputEl.files;
-  if(!files || files.length===0) return;
-  Array.from(files).forEach(file=>{
-    const reader = new FileReader();
-    reader.onload = function(e){
-      const texto = e.target.result;
-      let nombre = file.name, placemark = '', vertices = 0, areaHa = null, puntos = [];
-      try{
-        const xml = new DOMParser().parseFromString(texto, 'text/xml');
-        const nombreNode = xml.querySelector('Placemark > name') || xml.querySelector('name');
-        if(nombreNode) placemark = nombreNode.textContent.trim();
-        const coordNode = xml.querySelector('coordinates');
-        if(coordNode){
-          const pares = coordNode.textContent.trim().split(/\s+/).map(p=>p.split(',').map(Number)).filter(p=>p.length>=2 && !isNaN(p[0]) && !isNaN(p[1]));
-          vertices = pares.length;
-          puntos = pares.map(p=>[p[0], p[1]]);
-          if(pares.length>=3){ areaHa = areaPoligonoHa(pares); }
-        }
-      }catch(err){ console.error('No se pudo leer el KML', err); }
-      const kmlObj = {archivo: nombre, placemark, vertices, areaHa, puntos, satelite: null, bboxSatelital: null};
-      estado.parcelasAdicionales[idxBloque].kmls.push(kmlObj);
-      pintarParcelasAdicionales();
-      guardar();
-      if(puntos.length>=3){
-        const bbox = calcularBBoxPadded(puntos, 0.18);
-        obtenerImagenSatelital(bbox, 640, 420).then(dataUrl=>{
-          kmlObj.satelite = dataUrl;
-          kmlObj.bboxSatelital = bbox;
-          guardar();
-          pintarParcelasAdicionales();
-        }).catch(()=>{});
-      }
-    };
-    reader.readAsText(file);
-  });
-  inputEl.value = '';
-}
-function quitarKmlBloque(idxBloque, idxKml){
-  estado.parcelasAdicionales[idxBloque].kmls.splice(idxKml,1);
-  pintarParcelasAdicionales();
-  guardar();
-}
-
-// --- Render de todos los bloques de parcelas adicionales ---
-function pintarParcelasAdicionales(){
-  const cont = document.getElementById('parcelasAdicionalesLista');
-  if(!cont) return;
-  if(estado.parcelasAdicionales.length===0){ cont.innerHTML = '<p class="empty">No se han agregado otras parcelas a esta jornada.</p>'; return; }
-
-  cont.innerHTML = estado.parcelasAdicionales.map((bloque, idx)=>{
-    const opcionesParcela = '<option value="">— Selecciona una parcela —</option>' +
-      INVENTARIO.map((p,i)=>`<option value="${i}" ${String(bloque.parcelaIdx)===String(i)?'selected':''}>${p.rancho} · ${p.contrato} (${p.anio})</option>`).join('') +
-      `<option value="otra" ${bloque.parcelaIdx==='' && bloque.parcela ? 'selected':''}>Otra parcela (no listada)</option>`;
-
-    const costalesHtml = bloque.costales.map((c, ic)=>{
-      const inputId = `fotoCostalBloque_${idx}_${ic}`;
-      const fotoHtml = c.evidenciaFoto ? `
-        <div class="foto-thumb-wrap" style="margin-top:6px;">
-          <img src="${c.evidenciaFoto}" alt="Costal ${c.numero}">
-          <div class="foto-thumb-actions">
-            <button class="btn btn-ghost btn-sm" onclick="descargarFoto('${c.evidenciaFoto}','costal${c.numero}.jpg')" type="button">⬇️</button>
-            <button class="btn btn-danger btn-sm" onclick="quitarFotoCostalBloque(${idx},${ic})" type="button">Quitar</button>
-          </div>
-        </div>` : `
-        <label class="foto-capture-btn" for="${inputId}" style="margin-top:6px;">
-          📷 Tomar foto
-          <input type="file" id="${inputId}" accept="image/*" capture="environment" style="display:none;" onchange="onFotoCostalBloque(${idx},${ic},this)">
-        </label>`;
-      return `<div class="tambo-card" style="margin-top:6px;">
-        <div class="head"><span>Costal #${c.numero} · ${c.peso} kg</span><button class="del" onclick="quitarCostalBloque(${idx},${ic})">✕</button></div>
-        <label style="margin:4px 0 2px;">Aplicado por</label>
-        <input type="text" value="${c.aplicadoPor||''}" oninput="costalBloqueCambioAplicadoPor(${idx},${ic},this.value)">
-        <label style="margin:8px 0 2px;">Peso (kg)</label>
-        <input type="number" min="0" step="0.5" value="${c.peso}" onchange="costalBloqueCambioPeso(${idx},${ic},this.value)">
-        ${fotoHtml}
-      </div>`;
-    }).join('');
-
-    const evidenciasHtml = bloque.evidenciasGenerales.map((ev,i)=>`
-      <div class="galeria-item">
-        <img src="${ev.dataUrl}" alt="Evidencia">
-        <div class="cap"><span>Evidencia #${i+1}</span>
-          <span>
-            <button onclick="descargarFoto('${ev.dataUrl}', 'evidencia_${idx}_${i+1}.jpg')" type="button" style="color:var(--agave-dark);">⬇️</button>
-            <button onclick="quitarFotoGeneralBloque(${idx},${i})" type="button">✕</button>
-          </span>
-        </div>
-      </div>`).join('');
-
-    const kmlHtml = bloque.kmls.map((k,ik)=>{
-      const visual = k.satelite ? construirVistaSatelital(k) : (k.puntos && k.puntos.length>=3 ? construirSvgPoligono(k.puntos) : '');
-      return `<div class="kml-card">
-        <b>${k.placemark||k.archivo}</b>
-        Archivo: ${k.archivo}${k.vertices?' · '+k.vertices+' vértices':''}${k.areaHa?' · ≈ '+k.areaHa.toFixed(2)+' ha':''}
-        ${visual}
-        <div class="kml-remove"><button class="btn btn-danger btn-sm" onclick="quitarKmlBloque(${idx},${ik})" type="button">Quitar este polígono</button></div>
-      </div>`;
-    }).join('');
-
-    const kgBloque = bloque.costales.reduce((s,c)=> s+(parseFloat(c.peso)||0), 0);
-
-    return `
-    <div class="card" style="background:var(--cream);border:1.5px solid var(--ochre);margin-bottom:14px;">
-      <div class="head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <b style="color:var(--ochre-dark);">Parcela adicional #${idx+1}</b>
-        <button class="btn btn-danger btn-sm" onclick="quitarParcelaAdicional(${idx})" type="button">🗑️ Quitar parcela</button>
-      </div>
-
-      <label class="first">Parcela / rancho</label>
-      <select onchange="onParcelaBloqueChange(${idx}, this.value)">${opcionesParcela}</select>
-      <input type="text" id="parcelaBloqueManual_${idx}" placeholder="Nombre de la parcela" value="${bloque.parcelaIdx===''?(bloque.parcela||''):''}" oninput="parcelaBloqueManualCambio(${idx}, this.value)" style="display:${bloque.parcelaIdx===''&&bloque.parcela?'block':'none'};margin-top:6px;">
-      ${bloque.parcela ? `<p class="hint">${bloque.hectareas?bloque.hectareas+' ha · ':''}${bloque.anioPlantacion?'Año '+bloque.anioPlantacion+' · ':''}Inventario: ${(parseFloat(bloque.inventarioParcela)||0).toLocaleString('es-MX')} plantas</p>` : ''}
-
-      <label>Inventario de la parcela</label>
-      <input type="number" min="0" value="${bloque.inventarioParcela}" oninput="bloqueCambio(${idx},'inventarioParcela',this.value)">
-
-      <div class="row2" style="margin-top:8px;">
-        <div><label class="first">Avance en plantas (hoy)</label><input type="number" min="0" value="${bloque.avanceDiarioManual}" oninput="bloqueCambio(${idx},'avanceDiarioManual',this.value)"></div>
-        <div><label class="first">Jornales</label><input type="number" min="0" value="${bloque.jornaleros}" oninput="bloqueCambio(${idx},'jornaleros',this.value)"></div>
-      </div>
-
-      <label style="margin-top:10px;">Costales de esta parcela (${bloque.costales.length} · ${kgBloque.toLocaleString('es-MX')} kg)</label>
-      <button class="btn btn-ghost btn-sm btn-block" onclick="abrirNuevoCostalBloque(${idx})" type="button">+ Registrar costal</button>
-      ${costalesHtml}
-
-      <label style="margin-top:10px;">Evidencias fotográficas de esta parcela</label>
-      <label class="foto-capture-btn" for="fotoGeneralBloque_${idx}" style="margin-top:4px;">
-        📷 Agregar fotografía
-        <input type="file" id="fotoGeneralBloque_${idx}" accept="image/*" capture="environment" style="display:none;" onchange="onFotoGeneralBloque(${idx}, this)">
-      </label>
-      <div class="galeria-general">${evidenciasHtml}</div>
-
-      <label style="margin-top:10px;">Polígono(s) KML de esta parcela</label>
-      <label class="foto-capture-btn" for="kmlInputBloque_${idx}" style="margin-top:4px;">
-        🗺️ Cargar archivo(s) KML
-        <input type="file" id="kmlInputBloque_${idx}" accept=".kml,application/vnd.google-earth.kml+xml" multiple style="display:none;" onchange="onKmlInputBloque(${idx}, this)">
-      </label>
-      ${kmlHtml}
-    </div>`;
-  }).join('');
 }
 
 /* ---------------- Firma del auditor ---------------- */
@@ -3314,7 +3321,7 @@ if(navigator.storage && navigator.storage.persist){
 // para evitar perder de vista que hay una jornada en curso (los datos ya están guardados,
 // pero esto ayuda a que no se recargue la página sin querer a media captura).
 window.addEventListener('beforeunload', function(e){
-  const hayDatos = (estado.parcela && estado.parcela.trim()!=='');
+  const hayDatos = jornadaTieneContenido();
   if(hayDatos){
     e.preventDefault();
     e.returnValue = '';
