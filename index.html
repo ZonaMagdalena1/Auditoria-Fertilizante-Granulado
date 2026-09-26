@@ -563,6 +563,7 @@
     <p class="hint" style="margin-top:2px;">Si el avance de días anteriores no quedó guardado en este dispositivo, pon aquí el número del último costal que se aplicó en esta parcela (el de tu reporte en papel o el que recuerdes) y el siguiente costal que registres continuará desde ahí. Si lo dejas vacío, el sistema sigue calculándolo solo con lo que tenga guardado.</p>
 
     <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="abrirNuevoCostal()">+ Registrar costal aplicado</button>
+    <p class="hint" style="margin-top:6px;">El número de cada costal ya registrado se puede corregir a mano: tócalo junto a "Costal #" en la tarjeta correspondiente.</p>
 
     <div id="costalesLista" style="margin-top:12px;"></div>
     <div class="empty" id="costalesEmpty">Aún no se han registrado costales.</div>
@@ -1390,6 +1391,16 @@ function costalCambioPeso(idx, valor){
   actualizarResumen();
   guardar();
 }
+// Permite corregir manualmente el número de un costal (por si el consecutivo automático no coincide
+// con lo que se llevó en papel, o para acomodarlo a mano por cualquier motivo).
+function costalCambioNumero(idx, valor){
+  let n = parseInt(valor, 10);
+  if(isNaN(n) || n<0) n = 0;
+  estado.costales[idx].numero = n;
+  pintarCostales();
+  actualizarResumen();
+  guardar();
+}
 function costalCambioAplicadoPor(idx, valor){
   estado.costales[idx].aplicadoPor = valor;
   try{ localStorage.setItem('fert_ultimo_aplicador', valor); }catch(e){}
@@ -1457,7 +1468,7 @@ function pintarCostales(){
       </div>`;
     card.innerHTML = `
       <div class="head">
-        <span>Costal #${c.numero} · ${c.peso} kg</span>
+        <span style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;">Costal #<input type="number" min="0" value="${c.numero}" style="width:58px;padding:3px 5px;font-size:13px;display:inline-block;" onchange="costalCambioNumero(${idx}, this.value)"> · ${c.peso} kg</span>
         <button class="del" onclick="quitarCostal(${idx})">✕</button>
       </div>
       <div class="meta">Aplicado a las:
